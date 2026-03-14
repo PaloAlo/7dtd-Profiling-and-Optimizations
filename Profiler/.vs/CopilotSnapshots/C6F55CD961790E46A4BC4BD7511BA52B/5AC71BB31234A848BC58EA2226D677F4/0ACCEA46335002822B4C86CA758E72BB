@@ -1,0 +1,69 @@
+﻿// AttackTargetNullCheckPatch.cs
+//
+// Defensive patch for vanilla NullReferenceException in
+// GetAttackTargetHitPosition(). The game calls
+// attackTarget.getChestPosition() without checking for null,
+// which crashes when the target is killed between the AI decision
+// and the attack execution frame.
+//
+// Uses Harmony TargetMethods() to automatically discover and patch
+// EntityAlive.GetAttackTargetHitPosition plus every override in
+// derived types (e.g. EntityAnimalVulture).
+
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch]
+static class AttackTargetNullCheckPatch
+{
+    static IEnumerable<MethodBase> TargetMethods()
+    {
+        var baseMethod = typeof(EntityAlive).GetMethod(
+            nameof(EntityAlive.GetAttackTargetHitPosition),
+            BindingFlags.Public | BindingFlags.Instance);
+
+        if (baseMethod != null)
+        {
+            LogUtil.Info("Patching EntityAlive.GetAttackTargetHitPosition (null-check)");
+            yield return baseMethod;
+        }
+
+        var patched = new HashSet<Type> { typeof(EntityAlive) };
+
+        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            Type[] types;
+            try { types = asm.GetTypes(); }
+            catch { continue; }
+
+            foreach (var t in types)
+            {
+                if (patched.Contains(t)) continue;
+                if (!typeof(EntityAlive).IsAssignableFrom(t)) continue;
+
+                var method = t.GetMethod(
+                    nameof(EntityAlive.GetAttackTargetHitPosition),
+                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+
+                if (method == null) continue;
+
+                patched.Add(t);
+                LogUtil.Info($"Patching {t.Name}.GetAttackTargetHitPosition (null-check override)");
+                yield return method;
+            }
+        }
+    }
+
+    public static bool Prefix(EntityAlive __instance, ref Vector3 __result)
+    {
+        if (__instance.attackTarget == null)
+        {
+            __result = __instance.getChestPosition();
+            return false;
+        }
+        return true;
+    }
+}

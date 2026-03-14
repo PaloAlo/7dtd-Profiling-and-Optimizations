@@ -1,0 +1,116 @@
+﻿// ProfilerConfig.cs
+
+using System;
+using System.IO;
+using System.Reflection;
+using Newtonsoft.Json;
+using UnityEngine;
+
+[Serializable]
+public class ProfilerConfig
+{
+    // === OPTIMIZATION FEATURES ===
+    
+    public bool EnableStaggeredUpdate = true;    // LOD for updateTasks
+    public bool EnablePathCache = true;          // Cache pathfinding results
+    public bool EnableHiveMind = false;          // Group AI (experimental)
+    public bool HiveSkipUpdateTasksWhenSuggested = false;
+    public bool HiveSkipMoveWhenSuggested = false;
+    
+    public bool EnableMoveLOD = true;            // LOD for MoveEntityHeaded
+    public bool EnableTargetCache = true;        // Cache GetAttackTarget/GetRevengeTarget
+    public bool EnableStepSoundThrottle = true;  // Throttle step sound updates
+    public bool EnableDirectMove = false;        // Direct line-of-sight movement (experimental)
+
+    // More aggressive LOD thresholds
+    public float MoveLODTier1DistSq = 900f;      // 30m - never throttle closer
+    public float MoveLODTier2DistSq = 2500f;     // 50m - skip every 2nd frame
+    public float MoveLODTier3DistSq = 6400f;     // 80m - skip every 4th, beyond = 8th
+
+    public int StaggerModulo = 4;
+    public int HiveRadius = 30;
+    public int GroupUpdateInterval = 5;
+    public float PathCacheTTLSeconds = 3f;       // Increased from 2
+
+    public bool EnableSpatialGrid = true;        // ENABLED - use spatial grid for queries
+    public float SpatialGridCellSize = 8f;       // Cell size in world units
+    public bool EnablePathWorker = false;
+
+    // World tick slicing - spread entity updates across frames
+    // 1.0 = vanilla (all entities every frame)
+    // 2.0+ = slicing active
+    public float EntityTickFrameCountAverage = 2f;
+
+    // Instrumentation
+    public bool EnableDeepPhysicsInstrumentation = false;  // Adds overhead, use for profiling only
+
+    public const string ConfigFileName = "profiler_config.json";
+    private const int ConfigVersion = 3;
+
+    public int Version = ConfigVersion;
+
+    public static ProfilerConfig Current { get; private set; } = new ProfilerConfig();
+
+    public static void Load(string folder = null)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(folder))
+            {
+                folder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            }
+            string path = Path.Combine(folder, ConfigFileName);
+
+            if (File.Exists(path))
+            {
+                string json = File.ReadAllText(path);
+                var loaded = JsonConvert.DeserializeObject<ProfilerConfig>(json);
+                if (loaded != null)
+                {
+                    if (loaded.Version < ConfigVersion)
+                    {
+                        MigrateConfig(loaded);
+                        Save(folder);
+                    }
+                    Current = loaded;
+                    return;
+                }
+            }
+
+            Current = new ProfilerConfig();
+            Save(folder);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"Failed to load ProfilerConfig: {ex.Message}");
+            Current = new ProfilerConfig();
+        }
+    }
+
+    public static void Save(string folder = null)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(folder))
+            {
+                folder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            }
+            string path = Path.Combine(folder, ConfigFileName);
+            string json = JsonConvert.SerializeObject(Current, Formatting.Indented);
+            File.WriteAllText(path, json);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"Failed to save ProfilerConfig: {ex.Message}");
+        }
+    }
+
+    private static void MigrateConfig(ProfilerConfig old)
+    {
+        old.Version = ConfigVersion;
+        old.EnableTargetCache = true;
+        old.EnableStepSoundThrottle = true;
+        old.EnableDeepPhysicsInstrumentation = false;
+        old.EnableDirectMove = false;
+    }
+}

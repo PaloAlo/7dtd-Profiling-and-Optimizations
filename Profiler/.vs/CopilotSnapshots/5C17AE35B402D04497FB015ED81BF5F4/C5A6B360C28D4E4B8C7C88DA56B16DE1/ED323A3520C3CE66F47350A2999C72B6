@@ -1,0 +1,288 @@
+﻿# 7DTD Profiler — Optimization Patches
+
+## Overview
+
+This mod provides a suite of Harmony-based optimization patches for 7 Days to Die, targeting the main CPU bottlenecks during high-entity-count scenarios such as Tier 6 POI clears and blood moon hordes. All patches include **combat bypass** — entities actively fighting the player always receive full vanilla behavior.
+
+The mod also includes a built-in profiler that captures performance data automatically when FPS drops, enabling data-driven optimization.
+
+---
+
+## Architecture: How the Patches Work Together
+
+```
+┌──────────────────────────────────────────────────┐
+│                Entity Update Loop                │
+│  World.TickEntities → Entity.Update              │
+│                                                  │
+│  ┌──────────────┐    ┌───────────────────────┐   │
+│  │TargetCache   │──▶│ GetAttackTarget (cached)│ │
+│  │ (per-frame)  │    │ GetRevengeTarget(cached)│ │
+│  └──────────────┘    └───────────────────────┘   │
+│         │                                        │
+│         ▼                                        │
+│  ┌──────────────────────────────────────┐        │
+│  │ LOD Decision (distance + zombie count)│       │
+│  │  ├── Close/Combat → full update       │       │
+│  │  ├── Emergency mode (40+ zombies)     │       │
+│  │  └── Critical mode (80+ zombies)      │       │
+│  └──────────────────────────────────────┘        │
+│         │                                        │
+│    ┌────┴─────┐                                  │
+│    ▼          ▼                                  │
+│ updateTasks  MoveEntityHeaded                    │
+│ (AI LOD)     (Movement LOD)                      │
+│    │              │                              │
+│    │         ┌────┴────┐                         │
+│    │         ▼         ▼                         │
+│    │   MoveHelper  entityCollision               │
+│    │   (Throttle)  (Physics Throttle)            │
+│    │                                             │
+│    ▼                                             │
+│ FindPath (Duplicate-request throttle)            │
+│ StepSound (Sound throttle)                       │
+│ AttackTargetNullCheck (Crash prevention)          │
+└──────────────────────────────────────────────────┘
+```
+
+---
+
+## Patch Details
+
+### 1. Target Cache (`TargetCachePatch.cs`)
+
+**What it does:** Caches the results of `GetAttackTarget()` and `GetRevengeTarget()` per entity per frame so repeated calls within the same frame return instantly.
+
+**Why it matters:** These methods are called 5–10+ times per entity per frame from different systems (AI, movement, combat checks, our own bypass logic). Each call walks entity lists. Caching eliminates redundant work.
+
+| Metric | Value |
+|--------|-------|
+| Typical hit rate | 70–78% |
+| Calls saved per frame (80 zombies) | ~4,000–6,000 |
+| CPU savings | Moderate — eliminates list iteration overhead |
+
+**Safety:** Cache is per-frame and automatically invalidated. No stale data risk.
+
+---
+
+### 2. Movement LOD (`MoveEntityHeadedLODPatch.cs`)
+
+**What it does:** Throttles `EntityAlive.MoveEntityHeaded()` calls for non-combat, distant entities using a distance-tiered frame-skipping system.
+
+**Why it matters:** `MoveEntityHeaded` is consistently the **#1 CPU consumer** at 33–50% of total entity processing time. It handles heading calculations, rotation, and feeds into the physics collision system.
+
+| Distance | Normal | Emergency (40+ Z) | Critical (80+ Z) |
+|----------|--------|--------------------|-------------------|
+| < 30m | Every frame | Every frame | Every frame |
+| 30–50m | Every frame | Every 2nd frame | Every 3rd frame |
+| 50–80m | Every 3rd frame | Every 4th frame | Every 5th frame |
+| > 80m | Every 5th frame | Every 6th frame | Every 8th frame |
+
+**Combat bypass:** Entities with an attack target, revenge target, alert state, sleeping state, or investigate position always get full updates.
+
+| Metric | Value |
+|--------|-------|
+| Typical skip rate (high-load) | 5–33% depending on proximity |
+| CPU share addressed | 33–50% of total entity time |
+| Frame-slicing | Entity ID modulo distributes updates evenly |
+
+---
+
+### 3. AI Task LOD (`UpdateTasksLODPatch.cs`)
+
+**What it does:** Throttles `EntityAlive.updateTasks()` for distant, non-combat entities. Runs minimal maintenance (despawn check, see-cache clear) when skipping.
+
+**Why it matters:** `updateTasks` is the **#2 CPU consumer** at 21–29%. It runs the full EAI task list (approach, attack, wander, investigate, etc.) every frame for every entity.
+
+| Distance | Normal | Emergency (40+ Z) | Critical (80+ Z) |
+|----------|--------|--------------------|-------------------|
+| < 20m | Every frame | Every frame | Every frame |
+| 20–30m | Every frame | Every 2nd frame | Every 2nd frame |
+| 30–50m | Every frame | Every 2nd frame | Every 3rd frame |
+| 50–80m | Every 2nd frame | Every 4th frame | Every 5th frame |
+| > 80m | Every 4th frame | Every 6th frame | Every 8th frame |
+
+**Minimal maintenance on skip:** `CheckDespawn()` and `seeCache.ClearIfExpired()` still run to preserve entity lifecycle.
+
+| Metric | Value |
+|--------|-------|
+| Typical skip rate (high-load) | 4–33% depending on proximity |
+| CPU share addressed | 21–29% of total entity time |
+
+---
+
+### 4. Physics Collision Throttle (`EntityCollisionThrottlePatch.cs`)
+
+**What it does:** Throttles `Entity.entityCollision()` (which calls `CharacterController.Move()`) for distant, non-combat entities during emergency mode only.
+
+**Why it matters:** `CharacterController.Move()` is one of the most expensive single operations in Unity — it performs full physics collision detection against the world. During large hordes, distant zombies don't need pixel-perfect collision every frame.
+
+| Distance | Emergency (40+ Z) | Critical (80+ Z) |
+|----------|--------------------|-------------------|
+| < 20m | Every frame | Every frame |
+| 20–30m | Every frame | Every 2nd frame |
+| 30–50m | Every 2nd frame | Every 3rd frame |
+| > 50m | Every 3rd frame | Every 5th frame |
+
+**Safety:** Only activates in emergency mode. Combat entities always get full collision. No `ApplySimpleMotion` substitute (removed — it caused entities to fall through the world).
+
+| Metric | Value |
+|--------|-------|
+| Typical effectiveness | ~100% skip rate during emergency |
+| Activation threshold | 40+ zombies only |
+
+---
+
+### 5. Move Helper Throttle (`MoveHelperThrottlePatch.cs`)
+
+**What it does:** Throttles `EntityMoveHelper.UpdateMoveHelper()` obstacle checking. Only runs full obstacle detection (raycasting) when an entity appears stuck — otherwise, checks are spread out over many frames.
+
+**Why it matters:** `UpdateMoveHelper` does constant raycasting for `CheckWorldBlocked` and `CheckEntityBlocked` even when entities are moving freely. The stuck-detection logic means only entities that actually need course corrections get frequent checks.
+
+| State | Check Interval |
+|-------|---------------|
+| Moving freely | Every 20th frame |
+| Stuck | Every 4th frame (vanilla rate) |
+| Combat-engaged | Every frame |
+
+| Metric | Value |
+|--------|-------|
+| Typical throttle rate | High for wandering entities |
+| Stuck detection threshold | < 0.1m movement over check window |
+
+---
+
+### 6. FindPath Duplicate Throttle (`FindPathCachePatch.cs`)
+
+**What it does:** Blocks duplicate A* pathfinding requests for the same entity when the target position, entity position, and speed haven't changed within a configurable TTL window (default: 1 second).
+
+**Why it matters:** Distant idle zombies often re-request the exact same path repeatedly. Each `FindPath` triggers a full A* calculation. This patch prevents the redundant recalculation.
+
+**Safety:** Combat-engaged and close (< 20m) entities always get fresh paths. No path injection — the original path request simply proceeds or is blocked.
+
+| Metric | Value |
+|--------|-------|
+| Default TTL | 1 second |
+| Close bypass | 20m |
+| CPU savings | Small per-entity but prevents pathfinding spikes |
+
+---
+
+### 7. Step Sound Throttle (`ThrottleStepSoundPatch.cs`)
+
+**What it does:** Rate-limits `EntityAlive.updateStepSound()` to 20 Hz per entity (one call per 50ms).
+
+**Why it matters:** Step sounds are purely cosmetic. The vanilla game fires them every frame, which generates audio events and raycasts for ground material detection far more often than audibly necessary.
+
+| Metric | Value |
+|--------|-------|
+| Cooldown | 50ms (20 Hz per entity) |
+| Savings at 80 zombies | ~60 step-sound calls/frame eliminated |
+
+---
+
+### 8. Attack Target Null Check (`AttackTargetNullCheckPatch.cs`)
+
+**What it does:** Prevents `NullReferenceException` crashes in `GetAttackTargetHitPosition()` when the attack target is killed between the AI decision frame and the attack execution frame.
+
+**Why it matters:** This is a vanilla bug. When a target entity is destroyed mid-frame, `attackTarget.getChestPosition()` throws a NRE that propagates up through the entire entity tick loop. The patch returns the entity's own chest position as a safe fallback.
+
+**Coverage:** Dynamically discovers and patches all overrides of `GetAttackTargetHitPosition` at startup (base `EntityAlive` + all derived types like `EntityAnimalSnake`).
+
+---
+
+## Profiler System
+
+### Automatic High-Load Capture
+
+The profiler automatically captures detailed performance snapshots when:
+- FPS drops below 30 **and** zombie count is 50+
+- FPS drops below 50% of the established baseline
+
+Captures are debounced (30s minimum between captures) and limited to 5 per session.
+
+### Baseline FPS Tracking
+
+- Waits 120 seconds after game start to avoid measuring loading/trader screen FPS
+- Requires: < 10 zombies, 60-frame rolling average > 50 FPS
+- Updates upward if conditions improve by 15%+ (handles initial low readings)
+
+### Peak FPS Tracking
+
+- Filtered to < 200 FPS to exclude teleport/loading frames (where deltaTime approaches zero)
+
+### Output Files
+
+| File | Contents |
+|------|----------|
+| `7dtd_profile.csv` | 30-second summary rows with FPS, timing, and optimization counters |
+| `7dtd_HIGHLOAD_*.csv` | Detailed snapshots during FPS drops — timing breakdown, call counts, optimization effectiveness, cost-per-zombie |
+
+### Key CSV Columns
+
+| Column | Description |
+|--------|-------------|
+| `TargetCacheHits` / `Misses` | How effective the per-frame target cache is |
+| `MoveLODSkipped` | Movement updates skipped by distance LOD |
+| `TaskLODSkipped` | AI task updates skipped by distance LOD |
+| `CollisionSkipped` | Physics collision checks skipped |
+| `MoveHelperThrottled` | Move helper obstacle checks throttled |
+
+---
+
+## Test Results Summary
+
+### Session Data (Tier 6 POI Clear, 60–93 zombies)
+
+| Capture | Zombies | FPS | Top Bottleneck | LOD Skip Rate | Target Cache Hit |
+|---------|---------|-----|----------------|---------------|-----------------|
+| #1 (fresh spawn) | 82 | 29.9 | MoveEntityHeaded (44%) | 4.4% | 72.7% |
+| #2 (mid-clear) | 68 | 30.0 | MoveEntityHeaded (33%) | 32.7% | 71.8% |
+| #3 (heavy wave) | 73 | 29.9 | MoveEntityHeaded (36%) | 14.2% | 70.0% |
+| #4 (peak load) | 81 | 18.7 | MoveEntityHeaded (42%) | 7.5% | 74.0% |
+| #5 (declining) | 66 | 28.1 | MoveEntityHeaded (48%) | 9.7% | 70.3% |
+
+### Key Observations
+
+1. **MoveEntityHeaded dominates** at 33–50% of total CPU time across all captures
+2. **Target cache** consistently delivers 70–78% hit rate
+3. **LOD skip rates are low during intense combat** (4–14%) because most zombies are close/combat-engaged — this is **by design** (combat bypass ensures correct behavior)
+4. **LOD skip rates increase with distance** — capture #2 showed 33% skip rate when zombies were spread across multiple rooms
+5. **Collision throttle** shows ~100% effectiveness during emergency mode
+
+### Performance Without Mod vs With Mod
+
+Based on profiling data, without optimization patches the game would need to process:
+- ~80 `GetAttackTarget` + `GetRevengeTarget` calls per entity per frame (reduced to ~20 with cache)
+- Full `MoveEntityHeaded` every frame for all entities (reduced by 5–33% with LOD)
+- Full AI task evaluation every frame (reduced by 4–33% with LOD)
+- Full `CharacterController.Move()` every frame for distant zombies (reduced significantly during emergency mode)
+
+---
+
+## Configuration
+
+All patches can be toggled via the json config file loaded at startup:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `EnableProfiling` | `true` | Master switch for all profiling/timing instrumentation |
+| `EnableMoveLOD` | `true` | Movement and collision LOD throttling |
+| `EnableTargetCache` | `true` | Per-frame attack/revenge target caching |
+| `EnablePathCache` | `true` | FindPath duplicate-request throttle |
+| `EnableStaggeredUpdate` | `true` | AI task LOD throttling |
+| `EnableStepSoundThrottle` | `true` | Step sound rate limiting |
+| `EnableSpatialGrid` | `false` | Experimental spatial hash grid (disabled by default) |
+| `PathCacheTTLSeconds` | `1.0` | How long to block duplicate path requests |
+
+---
+
+## Safety Design Principles
+
+1. **Combat bypass on every patch** — entities with attack targets, revenge targets, alert state, sleeping state, or investigate positions always get vanilla behavior
+2. **Close-range bypass** — entities within 20m of the player are never throttled
+3. **Emergency scaling** — throttling only increases under genuine high-load conditions (40+ or 80+ zombies)
+4. **Frame slicing** — skipped updates are distributed evenly across frames using entity ID modulo, preventing all entities from updating on the same frame
+5. **Minimal maintenance** — even when AI tasks are skipped, `CheckDespawn()` and `seeCache.ClearIfExpired()` still run
+6. **No path injection** — paths are only blocked (not substituted), preventing stale-position navigation
+7. **Crash prevention** — null-check patches cover all derived type overrides dynamically

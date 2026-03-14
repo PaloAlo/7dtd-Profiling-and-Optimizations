@@ -1,0 +1,107 @@
+﻿// UpdateCurrentBlockPosAndValuePrefix.cs
+
+using System;
+using System.Reflection;
+using HarmonyLib;
+
+// Harmony prefix to skip expensive per-tick block logic when nothing changed.
+// Keeps only the essential HandleLootStageMaxCheck() call when safe.
+[HarmonyPatch]
+static class UpdateCurrentBlockPosAndValuePrefix
+{
+    static MethodBase TargetMethod()
+    {
+        var asm = AppDomain.CurrentDomain.GetAssemblies();
+        foreach (var a in asm)
+        {
+            try
+            {
+                if (!string.Equals(a.GetName().Name, "Assembly-CSharp", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                var t = a.GetType("EntityAlive");
+                if (t == null) continue;
+                var m = t.GetMethod("updateCurrentBlockPosAndValue", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (m != null) return m;
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    static bool Prefix(object __instance)
+    {
+        try
+        {
+            // Use reflection-lite access: common fields in decompiled EntityAlive are public.
+            // If they aren't, the reflection fallbacks below will still work.
+            var entity = __instance;
+            // Call GetBlockPosition() via reflection
+            var getBlockPos = entity.GetType().GetMethod("GetBlockPosition", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var worldField = entity.GetType().GetField("world", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (getBlockPos == null || worldField == null) return true; // fall back to original
+
+            var blockPos = (Vector3i)getBlockPos.Invoke(entity, null);
+            var world = worldField.GetValue(entity);
+
+            // world.GetBlock(Vector3i)
+            var getBlock = world.GetType().GetMethod("GetBlock", new Type[] { blockPos.GetType() });
+            if (getBlock == null) return true;
+
+            var block = getBlock.Invoke(world, new object[] { blockPos });
+
+            // handle air / child like original
+            var isAirProp = block.GetType().GetProperty("isair");
+            var isChildProp = block.GetType().GetProperty("ischild");
+            var parentField = block.GetType().GetField("parent");
+            if (isAirProp != null && (bool)isAirProp.GetValue(block))
+            {
+                blockPos.y--;
+                block = getBlock.Invoke(world, new object[] { blockPos });
+            }
+
+            if (isChildProp != null && (bool)isChildProp.GetValue(block) && parentField != null)
+            {
+                var parent = (Vector3i)parentField.GetValue(block);
+                blockPos += parent;
+                block = getBlock.Invoke(world, new object[] { blockPos });
+            }
+
+            // access stored fields
+            var storedPosField = entity.GetType().GetField("blockPosStandingOn", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var storedBlockField = entity.GetType().GetField("blockValueStandingOn", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var wasOnGroundField = entity.GetType().GetField("wasOnGround", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var onGroundField = entity.GetType().GetField("onGround", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+            if (storedPosField == null || storedBlockField == null || wasOnGroundField == null || onGroundField == null)
+                return true; // can't safely decide -> run original
+
+            var storedPos = (Vector3i)storedPosField.GetValue(entity);
+            var storedBlock = storedBlockField.GetValue(entity);
+            bool wasOnGround = (bool)wasOnGroundField.GetValue(entity);
+            bool onGround = (bool)onGroundField.GetValue(entity);
+
+            // Compare positions and blockvalue; if unchanged and we didn't just land, skip heavy work.
+            var equalsMethod = storedBlock.GetType().GetMethod("Equals", new Type[] { storedBlock.GetType() });
+            bool blocksEqual = false;
+            if (equalsMethod != null)
+            {
+                blocksEqual = (bool)equalsMethod.Invoke(storedBlock, new object[] { block });
+            }
+
+            if (storedPos.Equals(blockPos) && blocksEqual && !(onGround && !wasOnGround))
+            {
+                // only run the lightweight loot-stage check
+                var lootMethod = entity.GetType().GetMethod("HandleLootStageMaxCheck", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                lootMethod?.Invoke(entity, null);
+                return false; // skip original method
+            }
+        }
+        catch
+        {
+            // on any reflection error, run original method to be safe
+            return true;
+        }
+
+        return true; // didn't short-circuit; run original
+    }
+}

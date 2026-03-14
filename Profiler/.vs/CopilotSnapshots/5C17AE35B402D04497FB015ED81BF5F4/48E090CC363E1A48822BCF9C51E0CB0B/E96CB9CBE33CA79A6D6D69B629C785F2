@@ -1,0 +1,79 @@
+﻿// AttackTargetNullCheckPatch.cs
+//
+// Defensive patch for vanilla NullReferenceException in
+// GetAttackTargetHitPosition(). The game calls
+// attackTarget.getChestPosition() without checking for null,
+// which crashes when the target is killed between the AI decision
+// and the attack execution frame.
+//
+// Harmony patches on a base class do NOT intercept overrides in derived
+// classes, so we dynamically discover every override at startup and patch
+// them all. Known overrides: EntityAnimalSnake.
+
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntityAlive), nameof(EntityAlive.GetAttackTargetHitPosition))]
+static class AttackTargetNullCheckPatch
+{
+    public static bool Prefix(EntityAlive __instance, ref Vector3 __result)
+    {
+        if (__instance.attackTarget == null)
+        {
+            __result = __instance.getChestPosition();
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Scan all loaded types for overrides of GetAttackTargetHitPosition and
+    /// apply the same null-check prefix to each one.  Called once from ModInit.
+    /// </summary>
+    public static void PatchOverrides(Harmony harmony)
+    {
+        var baseMethod = typeof(EntityAlive).GetMethod(
+            nameof(EntityAlive.GetAttackTargetHitPosition),
+            BindingFlags.Public | BindingFlags.Instance);
+
+        if (baseMethod == null) return;
+
+        var prefix = new HarmonyMethod(typeof(AttackTargetNullCheckPatch),
+            nameof(Prefix));
+
+        var patched = new HashSet<Type> { typeof(EntityAlive) };
+
+        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            Type[] types;
+            try { types = asm.GetTypes(); }
+            catch { continue; }
+
+            foreach (var t in types)
+            {
+                if (patched.Contains(t)) continue;
+                if (!typeof(EntityAlive).IsAssignableFrom(t)) continue;
+
+                var method = t.GetMethod(
+                    nameof(EntityAlive.GetAttackTargetHitPosition),
+                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+
+                if (method == null) continue;
+
+                try
+                {
+                    harmony.Patch(method, prefix: prefix);
+                    patched.Add(t);
+                    LogUtil.Info($"Patched {t.Name}.GetAttackTargetHitPosition (null-check)");
+                }
+                catch (Exception ex)
+                {
+                    LogUtil.Warn($"Failed to patch {t.Name}.GetAttackTargetHitPosition: {ex.Message}");
+                }
+            }
+        }
+    }
+}

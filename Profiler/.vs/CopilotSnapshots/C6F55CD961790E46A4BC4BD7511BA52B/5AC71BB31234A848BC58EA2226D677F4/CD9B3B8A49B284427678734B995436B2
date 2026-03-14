@@ -1,0 +1,161 @@
+﻿// MoveHelperThrottlePatch.cs
+//
+// Throttles expensive obstacle checking in EntityMoveHelper.UpdateMoveHelper
+// Only runs CheckWorldBlocked/CheckEntityBlocked when entity appears stuck
+// This targets the root cause: constant raycasting even when moving freely
+// FIX: Combat-engaged entities always get full UpdateMoveHelper (prevents run-past/backtrack)
+
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+/// <summary>
+/// Intercept UpdateMoveHelper to throttle obstacle checking
+/// Only check for obstacles when entity is actually stuck (not making progress)
+/// </summary>
+[HarmonyPatch(typeof(EntityMoveHelper), nameof(EntityMoveHelper.UpdateMoveHelper))]
+public static class MoveHelperThrottlePatch
+{
+    // Track entity movement for stuck detection
+    private static readonly Dictionary<int, EntityMoveData> s_moveData = new(256);
+    
+    // Configuration
+    private const float STUCK_THRESHOLD_SQ = 0.01f;  // If moved less than 0.1m, consider stuck
+    private const int CHECK_INTERVAL_MOVING = 20;     // Check every 20 frames when moving freely
+    private const int CHECK_INTERVAL_STUCK = 4;       // Check every 4 frames when stuck (vanilla)
+    
+    private struct EntityMoveData
+    {
+        public Vector3 LastPosition;
+        public int LastCheckFrame;
+        public int StuckFrames;
+        public bool WasStuck;
+    }
+
+    /// <summary>
+    /// Prefix: Track movement and decide if we should skip this update entirely
+    /// </summary>
+    public static bool Prefix(EntityMoveHelper __instance, EntityAlive ___entity)
+    {
+        // Feature check
+        if (!ProfilerConfig.Current.EnableMoveLOD) return true;
+        if (___entity == null) return true;
+        
+        // Never throttle players
+        if (___entity is EntityPlayer) return true;
+
+        // Don't throttle if not active
+        if (!__instance.IsActive) return true;
+
+        // ALWAYS run full UpdateMoveHelper for combat-engaged entities
+        // This prevents run-past/backtrack behavior by ensuring course corrections
+        if (IsCombatOrStateActive(___entity)) return true;
+
+        try
+        {
+            int entityId = ___entity.entityId;
+            int currentFrame = Time.frameCount;
+            
+            FrameCache.EnsureUpdated();
+            int zombieCount = FrameCache.ZombieCount;
+            
+            // Get or create move data
+            if (!s_moveData.TryGetValue(entityId, out var data))
+            {
+                data = new EntityMoveData
+                {
+                    LastPosition = ___entity.position,
+                    LastCheckFrame = currentFrame,
+                    StuckFrames = 0,
+                    WasStuck = false
+                };
+                s_moveData[entityId] = data;
+                return true; // First frame, run normally
+            }
+
+            // Calculate movement since last check
+            Vector3 currentPos = ___entity.position;
+            float movedSq = (currentPos - data.LastPosition).sqrMagnitude;
+            int framesSinceCheck = currentFrame - data.LastCheckFrame;
+            
+            // Determine if entity is stuck
+            bool isStuck = movedSq < STUCK_THRESHOLD_SQ * framesSinceCheck;
+            
+            // Update stuck counter
+            if (isStuck)
+            {
+                data.StuckFrames++;
+            }
+            else
+            {
+                data.StuckFrames = 0;
+            }
+            
+            // Calculate check interval based on state and zombie count
+            int checkInterval;
+            if (data.StuckFrames > 3)
+            {
+                // Entity is stuck - check frequently
+                checkInterval = CHECK_INTERVAL_STUCK;
+            }
+            else if (zombieCount >= AdaptiveThresholds.CriticalZombieThreshold)
+            {
+                // Critical mode - very infrequent checks for moving entities
+                checkInterval = CHECK_INTERVAL_MOVING * 2;
+            }
+            else if (zombieCount >= AdaptiveThresholds.EmergencyZombieThreshold)
+            {
+                // Emergency mode - less frequent checks
+                checkInterval = CHECK_INTERVAL_MOVING;
+            }
+            else
+            {
+                // Normal mode - moderate throttling for moving entities
+                checkInterval = CHECK_INTERVAL_MOVING / 2;
+            }
+            
+            // Should we run the full update?
+            bool shouldRun = framesSinceCheck >= checkInterval || data.StuckFrames > 3;
+            
+            if (shouldRun)
+            {
+                data.LastPosition = currentPos;
+                data.LastCheckFrame = currentFrame;
+                data.WasStuck = isStuck;
+                s_moveData[entityId] = data;
+                return true; // Run full UpdateMoveHelper
+            }
+            
+            // Skip full update - entity continues with current movement
+            // The physics collision (entityCollision) still runs and handles real obstacles
+            ProfilingUtils.PerFrameCounters.Increment("MoveHelper.Throttled");
+            return false; // Skip original
+        }
+        catch
+        {
+            return true; // On error, run normally
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsCombatOrStateActive(EntityAlive entity)
+    {
+        if (entity.GetAttackTarget() != null) return true;
+        if (entity.GetRevengeTarget() != null) return true;
+        if (entity.hasBeenAttackedTime > 0) return true;
+        if (entity.isAlert) return true;
+        if (entity.HasInvestigatePosition) return true;
+        return false;
+    }
+
+    public static void OnEntityRemoved(int entityId)
+    {
+        s_moveData.Remove(entityId);
+    }
+
+    public static void ClearCaches()
+    {
+        s_moveData.Clear();
+    }
+}

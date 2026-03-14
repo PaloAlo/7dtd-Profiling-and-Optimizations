@@ -1,0 +1,204 @@
+﻿// PathRequestManager.cs
+// Manages path requests to reduce load on A* Pathfinding thread pool
+// - Batches requests to prevent flooding
+// - Caches completed paths for reuse
+// - Throttles per-entity request rate
+
+using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using UnityEngine;
+
+public static class PathRequestManager
+{
+    // Configuration
+    private const int MAX_REQUESTS_PER_FRAME = 8;
+    private const float MIN_REQUEST_INTERVAL = 0.2f; // 200ms between requests per entity
+    private const float PATH_REUSE_RADIUS_SQ = 4f;   // Reuse paths for targets within 2m
+    private const float PATH_CACHE_TTL = 2f;         // Seconds to keep cached paths
+
+    // Per-entity request tracking
+    private static readonly Dictionary<int, float> s_lastRequestTime = new(256);
+    
+    // Pending request queue (processed in batches)
+    private static readonly Queue<PendingRequest> s_pendingQueue = new();
+    
+    // Completed path cache (destination -> path info)
+    private static readonly Dictionary<long, CachedPath> s_pathCache = new(128);
+    
+    // Frame tracking
+    private static int s_lastProcessFrame = -1;
+    private static int s_requestsThisFrame = 0;
+
+    private struct PendingRequest
+    {
+        public int EntityId;
+        public Vector3 StartPos;
+        public Vector3 TargetPos;
+        public float Speed;
+        public bool CanBreak;
+        public object AiTask;
+        public float QueueTime;
+    }
+
+    private struct CachedPath
+    {
+        public Vector3 TargetPos;
+        public float Timestamp;
+        public bool IsValid;
+    }
+
+    public static bool IsEnabled => ProfilerConfig.Current?.EnablePathWorker ?? false;
+
+    /// <summary>
+    /// Check if an entity should be allowed to request a path this frame
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool ShouldAllowRequest(int entityId)
+    {
+        if (!IsEnabled) return true;
+
+        float now = Time.realtimeSinceStartup;
+
+        // Check per-entity rate limit
+        if (s_lastRequestTime.TryGetValue(entityId, out float lastTime))
+        {
+            if (now - lastTime < MIN_REQUEST_INTERVAL)
+            {
+                ProfilingUtils.PerFrameCounters.Increment("PathMgr.RateLimited");
+                return false;
+            }
+        }
+
+        // Check per-frame limit
+        int frame = Time.frameCount;
+        if (frame != s_lastProcessFrame)
+        {
+            s_lastProcessFrame = frame;
+            s_requestsThisFrame = 0;
+        }
+
+        if (s_requestsThisFrame >= MAX_REQUESTS_PER_FRAME)
+        {
+            ProfilingUtils.PerFrameCounters.Increment("PathMgr.FrameLimited");
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Record that a path request was made
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void RecordRequest(int entityId)
+    {
+        if (!IsEnabled) return;
+
+        s_lastRequestTime[entityId] = Time.realtimeSinceStartup;
+        s_requestsThisFrame++;
+        ProfilingUtils.PerFrameCounters.Increment("PathMgr.RequestsAllowed");
+    }
+
+    /// <summary>
+    /// Check if there's a cached path to approximately the same destination
+    /// </summary>
+    public static bool TryGetCachedPath(Vector3 targetPos, out object pathInfo)
+    {
+        pathInfo = null;
+        if (!IsEnabled) return false;
+
+        long key = GetDestinationKey(targetPos);
+        if (s_pathCache.TryGetValue(key, out var cached))
+        {
+            float now = Time.realtimeSinceStartup;
+            if (now - cached.Timestamp < PATH_CACHE_TTL && cached.IsValid)
+            {
+                // Check if target is close enough
+                float distSq = (cached.TargetPos - targetPos).sqrMagnitude;
+                if (distSq < PATH_REUSE_RADIUS_SQ)
+                {
+                    ProfilingUtils.PerFrameCounters.Increment("PathMgr.CacheHit");
+                    return true; // Caller should reuse existing path
+                }
+            }
+        }
+
+        ProfilingUtils.PerFrameCounters.Increment("PathMgr.CacheMiss");
+        return false;
+    }
+
+    /// <summary>
+    /// Cache a completed path for potential reuse
+    /// </summary>
+    public static void CachePath(Vector3 targetPos)
+    {
+        if (!IsEnabled) return;
+
+        long key = GetDestinationKey(targetPos);
+        s_pathCache[key] = new CachedPath
+        {
+            TargetPos = targetPos,
+            Timestamp = Time.realtimeSinceStartup,
+            IsValid = true
+        };
+    }
+
+    /// <summary>
+    /// Clean up per-entity data when entity is removed
+    /// </summary>
+    public static void OnEntityRemoved(int entityId)
+    {
+        s_lastRequestTime.Remove(entityId);
+    }
+
+    /// <summary>
+    /// Periodic cleanup of stale cache entries
+    /// </summary>
+    public static void CleanupStale()
+    {
+        float now = Time.realtimeSinceStartup;
+        float expireThreshold = now - PATH_CACHE_TTL * 2;
+
+        var keysToRemove = new List<long>();
+        foreach (var kvp in s_pathCache)
+        {
+            if (kvp.Value.Timestamp < expireThreshold)
+                keysToRemove.Add(kvp.Key);
+        }
+
+        foreach (var key in keysToRemove)
+            s_pathCache.Remove(key);
+
+        // Also clean up old entity request times
+        var entityKeysToRemove = new List<int>();
+        foreach (var kvp in s_lastRequestTime)
+        {
+            if (kvp.Value < expireThreshold)
+                entityKeysToRemove.Add(kvp.Key);
+        }
+
+        foreach (var key in entityKeysToRemove)
+            s_lastRequestTime.Remove(key);
+    }
+
+    /// <summary>
+    /// Generate a spatial key for destination caching
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static long GetDestinationKey(Vector3 pos)
+    {
+        // Round to 2m grid for grouping similar destinations
+        int x = (int)(pos.x * 0.5f);
+        int z = (int)(pos.z * 0.5f);
+        return ((long)x << 32) | (uint)z;
+    }
+
+    /// <summary>
+    /// Get stats for diagnostics
+    /// </summary>
+    public static (int trackedEntities, int cachedPaths, int queuedRequests) GetStats()
+    {
+        return (s_lastRequestTime.Count, s_pathCache.Count, s_pendingQueue.Count);
+    }
+}

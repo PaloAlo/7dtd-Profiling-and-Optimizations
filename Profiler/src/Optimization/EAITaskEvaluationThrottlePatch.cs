@@ -1,0 +1,66 @@
+// EAITaskEvaluationThrottlePatch.cs
+//
+// Throttles full task-list re-evaluation in EAIManager.Update when the
+// entity is already executing a high-priority action (approach & attack).
+//
+// Background: EAIManager.Update evaluates EVERY task in the task list each
+// frame to see if a higher-priority task should pre-empt. For a zombie that
+// is already mid-attack, this re-evaluation is almost always wasted — the
+// attack task rarely gets pre-empted mid-swing. By reducing re-evaluation
+// frequency for actively-attacking entities, we save significant CPU during
+// large hordes where 60+ zombies are all in the attack state simultaneously.
+//
+// SAFETY: We only throttle re-evaluation, not the active task's own Update().
+// The active task still runs every frame. We just skip the "should I switch
+// to a different task?" check on most frames.
+
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EAIManager), nameof(EAIManager.Update))]
+public static class EAITaskEvaluationThrottlePatch
+{
+    private static readonly Dictionary<int, int> s_lastEvalFrame = new Dictionary<int, int>(256);
+
+    // Re-evaluation intervals (in frames) when actively attacking
+    private const int EVAL_INTERVAL_EMERGENCY = 5;   // every 5th frame
+    private const int EVAL_INTERVAL_CRITICAL = 10;    // every 10th frame
+    private const int EVAL_INTERVAL_NORMAL = 3;       // every 3rd frame (light throttle)
+
+    public static bool Prefix(EAIManager __instance)
+    {
+        // DISABLED: A Harmony Prefix on EAIManager.Update cannot selectively
+        // skip only the task re-evaluation phase — returning false skips the
+        // ENTIRE Update including the active task's ContinueExecuting().
+        // This caused combat zombies to freeze their approach/attack logic
+        // for 5-10 frames, leading to running past the player, circling,
+        // and getting stuck. The UpdateTasksLODPatch already handles
+        // distance-based throttling for the outer updateTasks call.
+        return true;
+    }
+
+    /// <summary>
+    /// Check if the EAI manager is currently executing an attack-related task.
+    /// We check the active task list for approach/attack tasks.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsActivelyAttacking(EAIManager manager)
+    {
+        try
+        {
+            // The entity has an active attack target — it's in combat
+            var entity = manager.entity;
+            if (entity.GetAttackTarget() != null) return true;
+            if (entity.GetRevengeTarget() != null) return true;
+        }
+        catch { }
+        return false;
+    }
+
+    public static void OnEntityRemoved(int entityId)
+    {
+        s_lastEvalFrame.Remove(entityId);
+    }
+}

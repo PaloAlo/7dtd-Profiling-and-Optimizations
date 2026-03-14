@@ -1,0 +1,116 @@
+﻿// ProfilerConfig.cs
+
+using System;
+using System.IO;
+using System.Reflection;
+using Newtonsoft.Json;
+using UnityEngine;
+
+[Serializable]
+public class ProfilerConfig
+{
+    // === OPTIMIZATION FEATURES ===
+
+    public bool EnableStaggeredUpdate = true;    // LOD for updateTasks
+    public bool EnablePathCache = true;          // Cache pathfinding results
+
+    public bool EnableMoveLOD = true;            // LOD for MoveEntityHeaded + Collision + MoveHelper
+    public bool EnableTargetCache = true;        // Cache GetAttackTarget/GetRevengeTarget
+    public bool EnableStepSoundThrottle = true;  // Throttle step sound updates
+
+    // LOD distance thresholds (squared)
+    public float MoveLODTier1DistSq = 900f;      // 30m - never throttle closer
+    public float MoveLODTier2DistSq = 2500f;     // 50m
+    public float MoveLODTier3DistSq = 6400f;     // 80m
+
+    public float PathCacheTTLSeconds = 3f;
+
+    public bool EnableSpatialGrid = false;       // OFF by default - enable after verifying stable
+    public float SpatialGridCellSize = 8f;       // Cell size in world units
+
+    // Instrumentation
+    public bool EnableDeepPhysicsInstrumentation = false;  // Adds overhead, use for profiling only
+
+    public const string ConfigFileName = "profiler_config.json";
+    private const int ConfigVersion = 5;  // Bumped for cleanup
+
+    public int Version = ConfigVersion;
+
+    // Legacy fields kept for JSON deserialization compatibility (ignored at runtime)
+    [JsonProperty] internal bool EnableHiveMind = false;
+    [JsonProperty] internal bool HiveSkipUpdateTasksWhenSuggested = false;
+    [JsonProperty] internal bool HiveSkipMoveWhenSuggested = false;
+    [JsonProperty] internal bool EnableDirectMove = false;
+    [JsonProperty] internal bool EnablePathWorker = false;
+    [JsonProperty] internal int PathWorkerMaxPerFrame = 32;
+    [JsonProperty] internal float PathWorkerMinInterval = 0.05f;
+    [JsonProperty] internal float PathWorkerCacheTTL = 2f;
+    [JsonProperty] internal int StaggerModulo = 4;
+    [JsonProperty] internal int HiveRadius = 30;
+    [JsonProperty] internal int GroupUpdateInterval = 5;
+    [JsonProperty] internal float EntityTickFrameCountAverage = 1f;
+
+    public static ProfilerConfig Current { get; private set; } = new ProfilerConfig();
+
+    public static void Load(string folder = null)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(folder))
+            {
+                folder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            }
+            string path = Path.Combine(folder, ConfigFileName);
+
+            if (File.Exists(path))
+            {
+                string json = File.ReadAllText(path);
+                var loaded = JsonConvert.DeserializeObject<ProfilerConfig>(json);
+                if (loaded != null)
+                {
+                    if (loaded.Version < ConfigVersion)
+                    {
+                        MigrateConfig(loaded);
+                        Save(folder);
+                    }
+                    Current = loaded;
+                    return;
+                }
+            }
+
+            Current = new ProfilerConfig();
+            Save(folder);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"Failed to load ProfilerConfig: {ex.Message}");
+            Current = new ProfilerConfig();
+        }
+    }
+
+    public static void Save(string folder = null)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(folder))
+            {
+                folder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            }
+            string path = Path.Combine(folder, ConfigFileName);
+            string json = JsonConvert.SerializeObject(Current, Formatting.Indented);
+            File.WriteAllText(path, json);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"Failed to save ProfilerConfig: {ex.Message}");
+        }
+    }
+
+    private static void MigrateConfig(ProfilerConfig old)
+    {
+        old.Version = ConfigVersion;
+        old.EnableTargetCache = true;
+        old.EnableStepSoundThrottle = true;
+        old.EnableDeepPhysicsInstrumentation = false;
+    }
+}

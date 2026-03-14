@@ -1,0 +1,112 @@
+﻿// MoveEntityHeadedLODPatch.cs
+// Aggressive LOD-based throttling for EntityAlive.MoveEntityHeaded
+
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntityAlive), nameof(EntityAlive.MoveEntityHeaded))]
+public static class MoveEntityHeadedLODPatch
+{
+    private static readonly Dictionary<int, int> s_lastUpdateFrame = new Dictionary<int, int>(256);
+    private static Vector3 s_cachedPlayerPos;
+    private static int s_cachedPlayerFrame = -1;
+
+    public static bool Prefix(EntityAlive __instance, Vector3 _direction, bool _isDirAbsolute)
+    {
+        if (!ProfilerConfig.Current.EnableMoveLOD) return true;
+        if (__instance == null) return true;
+
+        // NEVER throttle players
+        if (__instance is EntityPlayer) return true;
+
+        // NEVER throttle entities in active combat
+        if (__instance.GetAttackTarget() != null) return true;
+        if (__instance.GetRevengeTarget() != null) return true;
+        if (__instance.hasBeenAttackedTime > 0) return true;
+        
+        // NEVER throttle alert or sleeping entities
+        if (__instance.isAlert) return true;
+        if (__instance.IsSleeping) return true;
+
+        // REMOVED: direction magnitude check - was preventing most skips
+        // Far idle entities are exactly what we want to throttle
+
+        try
+        {
+            int entityId = __instance.entityId;
+            int currentFrame = Time.frameCount;
+
+            UpdatePlayerPositionCache(currentFrame);
+            float distSq = (__instance.position - s_cachedPlayerPos).sqrMagnitude;
+
+            float tier1Sq = ProfilerConfig.Current.MoveLODTier1DistSq;
+            float tier2Sq = ProfilerConfig.Current.MoveLODTier2DistSq;
+            float tier3Sq = ProfilerConfig.Current.MoveLODTier3DistSq;
+
+            // Tier 0 (close) - ALWAYS run full update
+            if (distSq < tier1Sq)
+            {
+                return true;
+            }
+
+            // More aggressive skip intervals
+            int skipInterval;
+            if (distSq < tier2Sq)
+                skipInterval = 2;   // 30-50m: every 2nd frame
+            else if (distSq < tier3Sq)
+                skipInterval = 4;   // 50-80m: every 4th frame
+            else
+                skipInterval = 8;   // >80m: every 8th frame
+
+            // Frame-slicing: distribute updates across frames
+            int frameSlot = currentFrame % skipInterval;
+            int entitySlot = (entityId & 0x7FFFFFFF) % skipInterval;
+
+            if (frameSlot == entitySlot)
+            {
+                s_lastUpdateFrame[entityId] = currentFrame;
+                return true;
+            }
+
+            ProfilingUtils.PerFrameCounters.Increment("MoveEntityHeaded.LODSkipped");
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void UpdatePlayerPositionCache(int frame)
+    {
+        if (s_cachedPlayerFrame == frame) return;
+        s_cachedPlayerFrame = frame;
+
+        var world = GameManager.Instance?.World;
+        if (world == null) return;
+
+        var player = world.GetPrimaryPlayer();
+        if (player != null)
+        {
+            s_cachedPlayerPos = player.position;
+        }
+    }
+
+    public static void OnEntityRemoved(int entityId)
+    {
+        s_lastUpdateFrame.Remove(entityId);
+    }
+}
+
+// Extension kept for compatibility
+public static class EntityAliveExtensions
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool HasAttackTarget(this EntityAlive entity)
+    {
+        return entity.GetAttackTarget() != null;
+    }
+}

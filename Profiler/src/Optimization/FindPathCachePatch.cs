@@ -1,0 +1,141 @@
+// FindPathCachePatch.cs
+//
+// Lightweight duplicate-request throttle for EntityAlive.FindPath.
+// Blocks exact-same path requests within a short window for distant idle zombies.
+//
+// SAFETY: Combat-engaged or close (<20m) entities ALWAYS get fresh A* paths.
+// This ensures responsive targeting during active combat (vanilla behavior).
+// Hive-mind injection removed -- it only saved ~0.005ms total but caused
+// zombies to walk to stale cached positions.
+
+using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntityAlive), "FindPath")]
+static class FindPathCachePatch
+{
+    private static readonly Dictionary<int, PathRequestInfo> s_lastRequest =
+        new Dictionary<int, PathRequestInfo>(256);
+
+    private struct PathRequestInfo
+    {
+        public Vector3 TargetPos;
+        public float Speed;
+        public float Time;
+        public Vector3 EntityPos;
+    }
+
+    private const float CLOSE_DIST_SQ = 400f;       // 20m - always fresh paths
+    private const float DUPLICATE_DIST_SQ = 1f;      // 1m - threshold for "same request"
+
+    private static Vector3 s_cachedPlayerPos;
+    private static int s_cachedFrame = -1;
+
+    public static bool Prefix(EntityAlive __instance, Vector3 targetPos, float moveSpeed,
+                              bool canBreak, EAIBase behavior)
+    {
+        if (!ProfilerConfig.Current.EnablePathCache) return true;
+        if (__instance == null) return true;
+        if (__instance is EntityPlayer) return true;
+
+        try
+        {
+            // COMBAT BYPASS: active combatants always get fresh A* paths.
+            // Prevents zombies walking to stale positions during active combat.
+            if (IsCombatOrStateActive(__instance)) return true;
+
+            // CLOSE BYPASS: nearby entities always get fresh paths.
+            UpdatePlayerPos();
+            float distSq = (__instance.position - s_cachedPlayerPos).sqrMagnitude;
+            if (distSq < CLOSE_DIST_SQ) return true;
+
+            int entityId = __instance.entityId;
+            float now = Time.realtimeSinceStartup;
+            float ttl = ProfilerConfig.Current.PathCacheTTLSeconds;
+
+            // --- Duplicate-request throttle (distant non-combat only) ---
+            if (s_lastRequest.TryGetValue(entityId, out var lastReq))
+            {
+                float timeDiff = now - lastReq.Time;
+                if (timeDiff < ttl)
+                {
+                    float targetMovedSq = (targetPos - lastReq.TargetPos).sqrMagnitude;
+                    float entityMovedSq = (__instance.position - lastReq.EntityPos).sqrMagnitude;
+                    if (targetMovedSq < DUPLICATE_DIST_SQ
+                        && entityMovedSq < DUPLICATE_DIST_SQ
+                        && Mathf.Approximately(moveSpeed, lastReq.Speed))
+                    {
+                        ProfilingUtils.PerFrameCounters.Increment("FindPath.DuplicateBlocked");
+                        return false;
+                    }
+                }
+            }
+
+            // Record request and let original FindPath proceed
+            s_lastRequest[entityId] = new PathRequestInfo
+            {
+                TargetPos = targetPos,
+                Speed = moveSpeed,
+                Time = now,
+                EntityPos = __instance.position
+            };
+            ProfilingUtils.PerFrameCounters.Increment("FindPath.Allowed");
+        }
+        catch
+        {
+        }
+
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsCombatOrStateActive(EntityAlive entity)
+    {
+        if (entity.GetAttackTarget() != null) return true;
+        if (entity.GetRevengeTarget() != null) return true;
+        if (entity.hasBeenAttackedTime > 0) return true;
+        if (entity.isAlert) return true;
+        if (entity.HasInvestigatePosition) return true;
+        return false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void UpdatePlayerPos()
+    {
+        int frame = Time.frameCount;
+        if (s_cachedFrame == frame) return;
+        s_cachedFrame = frame;
+
+        var player = GameManager.Instance?.World?.GetPrimaryPlayer();
+        if (player != null)
+            s_cachedPlayerPos = player.position;
+    }
+
+    public static void CleanupStale()
+    {
+        float now = Time.realtimeSinceStartup;
+        float ttl = ProfilerConfig.Current.PathCacheTTLSeconds * 3f;
+
+        var keysToRemove = new List<int>();
+        foreach (var kvp in s_lastRequest)
+        {
+            if (now - kvp.Value.Time > ttl)
+                keysToRemove.Add(kvp.Key);
+        }
+        foreach (var k in keysToRemove)
+            s_lastRequest.Remove(k);
+    }
+
+    public static void OnEntityRemoved(int entityId)
+    {
+        s_lastRequest.Remove(entityId);
+    }
+
+    public static void Clear()
+    {
+        s_lastRequest.Clear();
+    }
+}

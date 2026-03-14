@@ -1,0 +1,21 @@
+﻿// DisableZombieStrafePatch.cs
+// Targeted Harmony patch to disable lateral strafing for zombies by modifying the _dist parameter in updateSpeedForwardAndStrafe.
+
+using HarmonyLib;
+using UnityEngine;
+
+// Disable lateral strafing so zombies come straight at the target.
+// Matches signature: void updateSpeedForwardAndStrafe(Vector3 _dist, float _partialTicks)
+[HarmonyPatch(typeof(EntityAlive), "updateSpeedForwardAndStrafe")]
+static class DisableZombieStrafePatch
+{
+    static void Prefix(ref Vector3 _dist, float _partialTicks)
+    {
+        // Remove lateral (x) movement entirely.
+        // You can instead clamp or scale it: _dist.x *= 0.2f; to reduce strafing.
+        _dist.x = 0f;
+
+        // Optional: force forward bias (always move forward rather than backward)
+        // if (_dist.z < 0f) _dist.z = -_dist.z;
+    }
+}

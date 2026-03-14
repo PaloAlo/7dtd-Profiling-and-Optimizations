@@ -1,0 +1,91 @@
+﻿// DeepPhysicsInstrumentation.cs
+// Identify exactly which physics calls inside MoveEntityHeaded are slowest
+
+using System.Diagnostics;
+using HarmonyLib;
+using UnityEngine;
+
+// Instrument Entity.entityCollision - the main physics hotspot
+[HarmonyPatch(typeof(Entity), nameof(Entity.entityCollision))]
+static class EntityCollisionInstrumentation
+{
+    private static readonly Stopwatch s_sw = new Stopwatch();
+
+    public static void Prefix()
+    {
+        if (!ProfilerConfig.Current.EnableDeepPhysicsInstrumentation) return;
+        s_sw.Restart();
+    }
+
+    public static void Postfix()
+    {
+        if (!ProfilerConfig.Current.EnableDeepPhysicsInstrumentation) return;
+        s_sw.Stop();
+        ProfilingUtils.RecordTiming("Entity.entityCollision", s_sw.Elapsed.TotalMilliseconds);
+        ProfilingUtils.PerFrameCounters.Increment("Entity.entityCollision.calls");
+    }
+}
+
+// Instrument World.GetCollidingBounds - builds collision list
+[HarmonyPatch(typeof(World), nameof(World.GetCollidingBounds))]
+static class GetCollidingBoundsInstrumentation
+{
+    private static readonly Stopwatch s_sw = new Stopwatch();
+
+    public static void Prefix()
+    {
+        if (!ProfilerConfig.Current.EnableDeepPhysicsInstrumentation) return;
+        s_sw.Restart();
+    }
+
+    public static void Postfix(System.Collections.Generic.List<Bounds> __result)
+    {
+        if (!ProfilerConfig.Current.EnableDeepPhysicsInstrumentation) return;
+        s_sw.Stop();
+        ProfilingUtils.RecordTiming("World.GetCollidingBounds", s_sw.Elapsed.TotalMilliseconds);
+        ProfilingUtils.PerFrameCounters.Increment("GetCollidingBounds.calls");
+        ProfilingUtils.PerFrameCounters.Add("GetCollidingBounds.boundsReturned", __result?.Count ?? 0);
+    }
+}
+
+// Instrument Block.GetClipBoundsList - gets per-block collision shapes
+[HarmonyPatch(typeof(Block), nameof(Block.GetClipBoundsList))]
+static class GetClipBoundsListInstrumentation
+{
+    private static readonly Stopwatch s_sw = new Stopwatch();
+
+    public static void Prefix()
+    {
+        if (!ProfilerConfig.Current.EnableDeepPhysicsInstrumentation) return;
+        s_sw.Restart();
+    }
+
+    public static void Postfix()
+    {
+        if (!ProfilerConfig.Current.EnableDeepPhysicsInstrumentation) return;
+        s_sw.Stop();
+        ProfilingUtils.RecordTiming("Block.GetClipBoundsList", s_sw.Elapsed.TotalMilliseconds);
+        ProfilingUtils.PerFrameCounters.Increment("Block.GetClipBoundsList.calls");
+    }
+}
+
+// Instrument DefaultMoveEntity - called by MoveEntityHeaded
+[HarmonyPatch(typeof(EntityAlive), "DefaultMoveEntity")]
+static class DefaultMoveEntityInstrumentation
+{
+    private static readonly Stopwatch s_sw = new Stopwatch();
+
+    public static void Prefix()
+    {
+        if (!ProfilerConfig.Current.EnableDeepPhysicsInstrumentation) return;
+        s_sw.Restart();
+    }
+
+    public static void Postfix()
+    {
+        if (!ProfilerConfig.Current.EnableDeepPhysicsInstrumentation) return;
+        s_sw.Stop();
+        ProfilingUtils.RecordTiming("EntityAlive.DefaultMoveEntity", s_sw.Elapsed.TotalMilliseconds);
+        ProfilingUtils.PerFrameCounters.Increment("DefaultMoveEntity.calls");
+    }
+}

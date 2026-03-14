@@ -1,0 +1,102 @@
+﻿// ProfilerConfig.cs
+
+using System;
+using System.IO;
+using System.Reflection;
+using Newtonsoft.Json;
+
+[Serializable]
+public class ProfilerConfig
+{
+    // === OPTIMIZATION FEATURES ===
+    public bool EnableMoveLOD = true;            // LOD for MoveEntityHeaded + Collision + MoveHelper
+       // LOD distance thresholds (squared)
+    public float MoveLODTier1DistSq = 900f;      // 30m - never throttle closer
+    public float MoveLODTier2DistSq = 2500f;     // 50m
+    public float MoveLODTier3DistSq = 6400f;     // 80m
+
+    public bool EnableStaggeredUpdate = true;    // LOD for updateTasks
+    public int StaggerModulo = 4;
+
+    public bool EnablePathCache = true;          // Cache pathfinding results
+    public float PathCacheTTLSeconds = 1f;
+
+    public bool EnableTargetCache = true;        // Cache GetAttackTarget/GetRevengeTarget
+    
+    public bool EnableStepSoundThrottle = true;  // Throttle step sound updates
+
+    public bool EnableSpatialGrid = false;       // OFF by default - enable after verifying stable
+    public float SpatialGridCellSize = 8f;       // Cell size in world units
+
+    // Instrumentation
+    public bool EnableDeepPhysicsInstrumentation = false;  // Adds overhead, use for profiling only
+
+    public const string ConfigFileName = "profiler_config.json";
+    private const int ConfigVersion = 5;  // Bumped for cleanup
+
+    public int Version = ConfigVersion;
+
+    public static ProfilerConfig Current { get; private set; } = new ProfilerConfig();
+
+    public static void Load(string folder = null)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(folder))
+            {
+                folder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            }
+            string path = Path.Combine(folder, ConfigFileName);
+
+            if (File.Exists(path))
+            {
+                string json = File.ReadAllText(path);
+                var loaded = JsonConvert.DeserializeObject<ProfilerConfig>(json);
+                if (loaded != null)
+                {
+                    if (loaded.Version < ConfigVersion)
+                    {
+                        MigrateConfig(loaded);
+                        Save(folder);
+                    }
+                    Current = loaded;
+                    return;
+                }
+            }
+
+            Current = new ProfilerConfig();
+            Save(folder);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"Failed to load ProfilerConfig: {ex.Message}");
+            Current = new ProfilerConfig();
+        }
+    }
+
+    public static void Save(string folder = null)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(folder))
+            {
+                folder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            }
+            string path = Path.Combine(folder, ConfigFileName);
+            string json = JsonConvert.SerializeObject(Current, Formatting.Indented);
+            File.WriteAllText(path, json);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"Failed to save ProfilerConfig: {ex.Message}");
+        }
+    }
+
+    private static void MigrateConfig(ProfilerConfig old)
+    {
+        old.Version = ConfigVersion;
+        old.EnableTargetCache = true;
+        old.EnableStepSoundThrottle = true;
+        old.EnableDeepPhysicsInstrumentation = false;
+    }
+}

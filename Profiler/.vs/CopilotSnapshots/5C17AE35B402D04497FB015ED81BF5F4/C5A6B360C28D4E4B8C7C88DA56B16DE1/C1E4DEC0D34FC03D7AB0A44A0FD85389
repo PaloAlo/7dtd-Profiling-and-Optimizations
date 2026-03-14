@@ -1,0 +1,129 @@
+﻿// EAITaskEvaluationThrottlePatch.cs
+//
+// Throttles full task-list re-evaluation in EAIManager.Update when the
+// entity is already executing a high-priority action (approach & attack).
+//
+// Background: EAIManager.Update evaluates EVERY task in the task list each
+// frame to see if a higher-priority task should pre-empt. For a zombie that
+// is already mid-attack, this re-evaluation is almost always wasted — the
+// attack task rarely gets pre-empted mid-swing. By reducing re-evaluation
+// frequency for actively-attacking entities, we save significant CPU during
+// large hordes where 60+ zombies are all in the attack state simultaneously.
+//
+// SAFETY: We only throttle re-evaluation, not the active task's own Update().
+// The active task still runs every frame. We just skip the "should I switch
+// to a different task?" check on most frames.
+
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EAIManager), nameof(EAIManager.Update))]
+public static class EAITaskEvaluationThrottlePatch
+{
+    private static readonly Dictionary<int, int> s_lastEvalFrame = new Dictionary<int, int>(256);
+
+    private static int s_cachedZombieCount;
+    private static int s_cachedFrame = -1;
+
+    // Re-evaluation intervals (in frames) when actively attacking
+    private const int EVAL_INTERVAL_EMERGENCY = 5;   // every 5th frame
+    private const int EVAL_INTERVAL_CRITICAL = 10;    // every 10th frame
+    private const int EVAL_INTERVAL_NORMAL = 3;       // every 3rd frame (light throttle)
+
+    public static bool Prefix(EAIManager __instance)
+    {
+        if (!ProfilerConfig.Current.EnableStaggeredUpdate) return true;
+        if (__instance == null) return true;
+
+        try
+        {
+            var entity = __instance.entity;
+            if (entity == null) return true;
+
+            // Never throttle player AI
+            if (entity is EntityPlayer) return true;
+
+            UpdateCaches(Time.frameCount);
+
+            // Only throttle when zombie count is elevated
+            if (s_cachedZombieCount < AdaptiveThresholds.EmergencyZombieThreshold) return true;
+
+            // Only throttle if the entity has an active attack/approach task running.
+            // If no task is running or it's a low-priority task, allow full evaluation
+            // so the entity can pick up new behaviors normally.
+            if (!IsActivelyAttacking(__instance)) return true;
+
+            int entityId = entity.entityId;
+            int currentFrame = Time.frameCount;
+
+            int evalInterval;
+            if (s_cachedZombieCount >= AdaptiveThresholds.CriticalZombieThreshold)
+                evalInterval = EVAL_INTERVAL_CRITICAL;
+            else if (s_cachedZombieCount >= AdaptiveThresholds.EmergencyZombieThreshold)
+                evalInterval = EVAL_INTERVAL_EMERGENCY;
+            else
+                evalInterval = EVAL_INTERVAL_NORMAL;
+
+            if (s_lastEvalFrame.TryGetValue(entityId, out int lastFrame))
+            {
+                int framesSince = currentFrame - lastFrame;
+                if (framesSince < evalInterval)
+                {
+                    ProfilingUtils.PerFrameCounters.Increment("EAIManager.EvalThrottled");
+                    return false;
+                }
+            }
+
+            s_lastEvalFrame[entityId] = currentFrame;
+            return true;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Check if the EAI manager is currently executing an attack-related task.
+    /// We check the active task list for approach/attack tasks.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsActivelyAttacking(EAIManager manager)
+    {
+        try
+        {
+            // The entity has an active attack target — it's in combat
+            var entity = manager.entity;
+            if (entity.GetAttackTarget() != null) return true;
+            if (entity.GetRevengeTarget() != null) return true;
+        }
+        catch { }
+        return false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void UpdateCaches(int frame)
+    {
+        if (s_cachedFrame == frame) return;
+        s_cachedFrame = frame;
+
+        var world = GameManager.Instance?.World;
+        if (world == null) return;
+
+        s_cachedZombieCount = 0;
+        var entities = world.Entities.list;
+        for (int i = 0; i < entities.Count; i++)
+        {
+            var entity = entities[i];
+            if (entity != null && entity is EntityZombie)
+                s_cachedZombieCount++;
+        }
+    }
+
+    public static void OnEntityRemoved(int entityId)
+    {
+        s_lastEvalFrame.Remove(entityId);
+    }
+}

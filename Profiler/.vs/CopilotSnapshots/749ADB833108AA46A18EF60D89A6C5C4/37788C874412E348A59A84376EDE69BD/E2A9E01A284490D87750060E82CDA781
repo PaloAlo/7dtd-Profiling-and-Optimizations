@@ -1,0 +1,20 @@
+﻿// EntityCleanupPatch.cs
+// Clean up all per-entity caches when entities are removed
+
+using HarmonyLib;
+
+[HarmonyPatch(typeof(World), nameof(World.RemoveEntity))]
+static class EntityCleanupPatch
+{
+    static void Prefix(int _entityId)
+    {
+        MoveEntityHeadedLODPatch.OnEntityRemoved(_entityId);
+        UpdateTasksLODPatch.OnEntityRemoved(_entityId);
+        GetAttackTargetCachePatch.OnEntityRemoved(_entityId);
+        GetRevengeTargetCachePatch.OnEntityRemoved(_entityId);
+        FindPathCachePatch.OnEntityRemoved(_entityId);
+        SpatialGridManager.OnEntityRemoved(_entityId);
+        MoveHelperThrottlePatch.OnEntityRemoved(_entityId);
+        EntityCollisionThrottlePatch.OnEntityRemoved(_entityId);
+    }
+}

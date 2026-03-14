@@ -1,0 +1,96 @@
+﻿// SpatialGridEAIPatch.cs
+// Optimize EAI target finding using spatial grid instead of iterating all entities
+// Added fallback to original when grid is not yet populated.
+
+using System.Collections.Generic;
+using HarmonyLib;
+using UnityEngine;
+
+/// <summary>
+/// Optimize World.GetClosestPlayer using spatial grid for initial filtering
+/// </summary>
+[HarmonyPatch(typeof(World), nameof(World.GetClosestPlayer), 
+    new System.Type[] { typeof(Vector3), typeof(float), typeof(bool) })]
+static class GetClosestPlayerSpatialPatch
+{
+    // This method is already efficient (iterates Players.list which is small)
+    // No optimization needed - players are few
+}
+
+/// <summary>
+/// Optimize aiClosest list population using spatial grid
+/// This is called during EntityActivityUpdate and affects AI performance
+/// </summary>
+[HarmonyPatch(typeof(World), "EntityActivityUpdate")]
+static class EntityActivityUpdateSpatialPatch
+{
+    private static readonly List<int> s_nearbyBuffer = new(128);
+
+    static bool Prefix(World __instance)
+    {
+        // Fall back to original when spatial grid is disabled or not populated
+        if (!ProfilerConfig.Current.EnableSpatialGrid) return true;
+        if (!SpatialGridManager.IsEnabled) return true;
+        if (SpatialGridManager.EntityCount == 0) return true; // fallback - grid not ready
+
+        var players = __instance.Players.list;
+        
+        for (int i = 0; i < players.Count; i++)
+        {
+            var player = players[i];
+            if (player == null || !player.Spawned) continue;
+            
+            player.aiClosest.Clear();
+            
+            // Query nearby entities (100m radius)
+            SpatialGridManager.QueryNearby(player.position, 100f, s_nearbyBuffer);
+            
+            for (int j = 0; j < s_nearbyBuffer.Count; j++)
+            {
+                int entityId = s_nearbyBuffer[j];
+                var entity = __instance.GetEntity(entityId) as EntityAlive;
+                
+                if (entity == null) continue;
+                if (entity == player) continue;
+                if (entity is EntityPlayer) continue;
+                if (entity.IsDead()) continue;
+                
+                float distSq = entity.GetDistanceSq(player);
+                entity.aiClosestPlayerDistSq = distSq;
+                player.aiClosest.Add(entity);
+            }
+        }
+
+        ProfilingUtils.PerFrameCounters.Increment("SpatialGrid.ActivityUpdates");
+        return false; // Skip original
+    }
+}
+
+/// <summary>
+/// Command to dump spatial grid stats
+/// </summary>
+public class ConsoleCmdSpatialGrid : ConsoleCmdAbstract
+{
+    public override string[] getCommands() => new[] { "spatialgrid", "sg" };
+
+    public override string getDescription() => "Show spatial grid statistics";
+
+    public override void Execute(List<string> _params, CommandSenderInfo _senderInfo)
+    {
+        if (_params.Count > 0 && _params[0] == "toggle")
+        {
+            ProfilerConfig.Current.EnableSpatialGrid = !ProfilerConfig.Current.EnableSpatialGrid;
+            ProfilerConfig.Save();
+            SingletonMonoBehaviour<SdtdConsole>.Instance.Output(
+                $"SpatialGrid enabled: {ProfilerConfig.Current.EnableSpatialGrid}");
+            return;
+        }
+
+        SingletonMonoBehaviour<SdtdConsole>.Instance.Output("=== Spatial Grid Stats ===");
+        SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Enabled: {SpatialGridManager.IsEnabled}");
+        SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Entity Count: {SpatialGridManager.EntityCount}");
+        SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Cell Count: {SpatialGridManager.CellCount}");
+        SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Cell Size: {ProfilerConfig.Current.SpatialGridCellSize}m");
+        SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Use 'sg toggle' to enable/disable");
+    }
+}

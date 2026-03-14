@@ -1,0 +1,73 @@
+﻿// PathResultCapturePatch.cs
+//
+// Captures successful path results into the hive-mind PathCache.
+// Patches ASPPathNavigate.SetPath -- when a zombie receives a fresh A* path,
+// we snapshot the waypoints so nearby zombies can reuse them.
+
+using System;
+using System.Linq;
+using System.Reflection;
+using GamePath;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch]
+static class PathResultCapturePatch
+{
+    static MethodBase TargetMethod()
+    {
+        var asm = typeof(EntityAlive).Assembly;
+        var t = asm.GetType("GamePath.ASPPathNavigate")
+             ?? asm.GetTypes().FirstOrDefault(x => x.Name == "ASPPathNavigate");
+
+        if (t == null) return null;
+        return AccessTools.Method(t, "SetPath", new[] { typeof(PathInfo), typeof(float) });
+    }
+
+    public static void Postfix(object __instance, PathInfo _pathInfo, bool __result)
+    {
+        if (!ProfilerConfig.Current.EnablePathCache) return;
+        if (!__result) return;
+
+        try
+        {
+            if (_pathInfo?.path == null) return;
+
+            PathEntity pe = _pathInfo.path;
+            if (pe.points == null) return;
+
+            int count = pe.getCurrentPathLength();
+            if (count < 2) return;
+
+            var navigator = __instance as PathNavigate;
+            if (navigator == null) return;
+
+            EntityAlive entity = navigator.theEntity;
+            if (entity == null) return;
+
+            EntityAlive attackTarget = entity.GetAttackTarget();
+            if (attackTarget == null) return;
+
+            var waypoints = new Vector3[count];
+            for (int i = 0; i < count; i++)
+            {
+                waypoints[i] = pe.points[i].projectedLocation;
+            }
+
+            PathCache.Store(
+                attackTarget.entityId,
+                entity.position,
+                _pathInfo.targetPos,
+                _pathInfo.canBreakBlocks,
+                waypoints,
+                pe.rawEndPos
+            );
+
+            ProfilingUtils.PerFrameCounters.Increment("PathCache.Store");
+        }
+        catch
+        {
+            // Never break navigation for diagnostics
+        }
+    }
+}

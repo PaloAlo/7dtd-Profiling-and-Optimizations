@@ -1,0 +1,91 @@
+﻿// SpeedStrafeThrottlePatch.cs
+//
+// Throttles EntityAlive.updateSpeedForwardAndStrafe for distant entities.
+// MoveEntityHeaded is consistently 33-50% of total CPU time. A large portion
+// of that cost is heading/rotation recalculation via updateSpeedForwardAndStrafe.
+//
+// Even during combat, a zombie at 40m+ doesn't need its heading recalculated
+// every single frame — every 2nd or 3rd frame is visually indistinguishable.
+// This patch applies a lighter throttle than the full MoveEntityHeaded LOD:
+// it lets the main movement call through but skips the expensive sub-calculation.
+
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntityAlive), "updateSpeedForwardAndStrafe")]
+public static class SpeedStrafeThrottlePatch
+{
+    private static readonly Dictionary<int, int> s_lastFrame = new Dictionary<int, int>(256);
+
+    private const float ALWAYS_RUN_DIST_SQ = 625f;
+    private const float MID_DIST_SQ = 1600f;        // 40m
+    private const float FAR_DIST_SQ = 4900f;        // 70m
+    public static bool Prefix(EntityAlive __instance)
+    {
+        if (!ProfilerConfig.Current.EnableMoveLOD) return true;
+        if (__instance == null) return true;
+        if (__instance is EntityPlayer) return true;
+
+        // ALWAYS recalculate heading for combat-engaged entities.
+        // Stale heading causes zombies to overshoot and run past the player.
+        if (IsCombatOrStateActive(__instance)) return true;
+
+        try
+        {
+            int entityId = __instance.entityId;
+            int currentFrame = Time.frameCount;
+
+            FrameCache.EnsureUpdated();
+            int zombieCount = FrameCache.ZombieCount;
+
+            // Below emergency zombie count, don't throttle at all
+            if (zombieCount < AdaptiveThresholds.EmergencyZombieThreshold) return true;
+
+            float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
+
+            // Close entities — always full update
+            if (distSq < ALWAYS_RUN_DIST_SQ) return true;
+
+            bool criticalMode = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
+
+            int skipInterval;
+            if (distSq < MID_DIST_SQ)
+            {
+                skipInterval = criticalMode ? 3 : 2;
+            }
+            else if (distSq < FAR_DIST_SQ)
+            {
+                skipInterval = criticalMode ? 4 : 3;
+            }
+            else
+            {
+                skipInterval = criticalMode ? 6 : 4;
+            }
+
+            if (skipInterval <= 1) return true;
+
+            int frameSlot = currentFrame % skipInterval;
+            int entitySlot = (entityId & 0x7FFFFFFF) % skipInterval;
+
+            if (frameSlot == entitySlot)
+            {
+                s_lastFrame[entityId] = currentFrame;
+                return true;
+            }
+
+            ProfilingUtils.PerFrameCounters.Increment("SpeedStrafe.Throttled");
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    public static void OnEntityRemoved(int entityId)
+    {
+        s_lastFrame.Remove(entityId);
+    }
+}

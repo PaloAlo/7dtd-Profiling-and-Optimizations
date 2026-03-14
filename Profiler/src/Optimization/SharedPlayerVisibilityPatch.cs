@@ -1,0 +1,112 @@
+// SharedPlayerVisibilityPatch.cs
+//
+// During large hordes, many zombies call EntitySeeCache.CanSee to check LOS
+// against the same player each frame. Each call does a raycast. This patch
+// caches the player's "visible from sector" result per frame so that nearby
+// zombies in the same chunk sector share one raycast result instead of each
+// doing their own.
+//
+// The cache is keyed on (sourceChunkX, sourceChunkZ, frame) — entities in the
+// same 16×16 chunk column share visibility. This is a safe approximation
+// because LOS from nearby positions to the same target almost always matches.
+
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntitySeeCache), nameof(EntitySeeCache.CanSee))]
+public static class SharedPlayerVisibilityPatch
+{
+    // Cache: (chunkX, chunkZ, frame) → can-see-player result
+    private static readonly Dictionary<long, bool> s_visibilityCache = new Dictionary<long, bool>(64);
+    private static int s_lastClearFrame = -1;
+
+    private static int s_cachedZombieCount;
+    private static int s_cachedFrame = -1;
+
+    public static bool Prefix(EntitySeeCache __instance, EntityAlive ___theEntity, Entity _e, ref bool __result)
+    {
+        if (!ProfilerConfig.Current.EnableTargetCache) return true;
+        if (___theEntity == null || _e == null) return true;
+
+        try
+        {
+            // Only optimize for checks against the player
+            if (!(_e is EntityPlayer)) return true;
+
+            int frame = Time.frameCount;
+
+            UpdateCaches(frame);
+
+            // Only activate during high-load to avoid false-positive visibility
+            if (s_cachedZombieCount < AdaptiveThresholds.EmergencyZombieThreshold) return true;
+
+            // Clear per-frame cache
+            if (s_lastClearFrame != frame)
+            {
+                s_visibilityCache.Clear();
+                s_lastClearFrame = frame;
+            }
+
+            // Key: combine chunk position into a single long
+            var pos = ___theEntity.position;
+            int chunkX = Mathf.FloorToInt(pos.x) >> 4;
+            int chunkZ = Mathf.FloorToInt(pos.z) >> 4;
+            long key = ((long)chunkX << 32) | (uint)chunkZ;
+
+            if (s_visibilityCache.TryGetValue(key, out bool cached))
+            {
+                __result = cached;
+                ProfilingUtils.PerFrameCounters.Increment("SeeCache.SharedHit");
+                return false;
+            }
+
+            // Let the original run — we'll capture the result in postfix
+            return true;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    public static void Postfix(EntitySeeCache __instance, EntityAlive ___theEntity, Entity _e, bool __result)
+    {
+        if (!ProfilerConfig.Current.EnableTargetCache) return;
+        if (___theEntity == null || _e == null) return;
+        if (!(_e is EntityPlayer)) return;
+
+        try
+        {
+            if (s_cachedZombieCount < AdaptiveThresholds.EmergencyZombieThreshold) return;
+
+            var pos = ___theEntity.position;
+            int chunkX = Mathf.FloorToInt(pos.x) >> 4;
+            int chunkZ = Mathf.FloorToInt(pos.z) >> 4;
+            long key = ((long)chunkX << 32) | (uint)chunkZ;
+
+            s_visibilityCache[key] = __result;
+        }
+        catch { }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void UpdateCaches(int frame)
+    {
+        if (s_cachedFrame == frame) return;
+        s_cachedFrame = frame;
+
+        var world = GameManager.Instance?.World;
+        if (world == null) return;
+
+        s_cachedZombieCount = 0;
+        var entities = world.Entities.list;
+        for (int i = 0; i < entities.Count; i++)
+        {
+            var entity = entities[i];
+            if (entity != null && entity is EntityZombie)
+                s_cachedZombieCount++;
+        }
+    }
+}

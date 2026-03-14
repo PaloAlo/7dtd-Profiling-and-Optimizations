@@ -1,0 +1,70 @@
+﻿// CanSeeCache.cs
+
+using System;
+using Profiler.Patches;
+
+namespace Profiler.Patches
+{
+    /// <summary>
+    /// Lightweight, main-thread-safe cache specialized for CanSee results.
+    /// Stores boolean results keyed by a coarse spatial key produced from
+    /// source/target positions and the query parameters (radius/angle/etc).
+    /// TTL is short (default 0.25s) to keep responses timely while removing duplicate work.
+    /// </summary>
+    internal static class CanSeeCache
+    {
+        private static readonly SharedQueryCache s_cache = new SharedQueryCache(0.25);
+
+        /// <summary>
+        /// Build a deterministic, coarse key for a CanSee query.
+        /// - bucketSize controls spatial coarseness (meters). 2..8 is a reasonable range.
+        /// - radius and dotThreshold (cos(angle)) are included so different FOVs cache separately.
+        /// </summary>
+        public static SharedQueryKey MakeKey(UnityEngine.Vector3 sourcePos, UnityEngine.Vector3 targetPos, int radiusMeters, float dotThreshold, int bucketSize = 4)
+        {
+            int cellX = (int)Math.Floor(sourcePos.x / bucketSize);
+            int cellY = (int)Math.Floor(sourcePos.y / bucketSize);
+            int cellZ = (int)Math.Floor(sourcePos.z / bucketSize);
+
+            // compress fine target offset into coarse cells to reduce key cardinality
+            int tX = (int)Math.Floor(targetPos.x / bucketSize);
+            int tY = (int)Math.Floor(targetPos.y / bucketSize);
+            int tZ = (int)Math.Floor(targetPos.z / bucketSize);
+
+            // include target cell in the radius field to keep key deterministic
+            // combine radiusMeters and packed dotThreshold into a single int for the key
+            int packed = radiusMeters;
+            // pack dotThreshold (0..1) into 0..255
+            int dotPacked = (int)Math.Clamp((dotThreshold * 255f), 0f, 255f);
+            packed = (packed << 8) ^ dotPacked;
+
+            // Build a query type string including both source and target coarse cell and bucket
+            string qtype = $"CanSee_src={cellX},{cellY},{cellZ}_t={tX},{tY},{tZ}_b={bucketSize}";
+
+            // Use target cell as the 'radius' slot to further distinguish keys.
+            // Note: SharedQueryKey is coarse and intended to dedupe near-identical queries.
+            return new SharedQueryKey(cellX ^ tX, cellY ^ tY, cellZ ^ tZ, packed, qtype);
+        }
+
+        /// <summary>
+        /// Try to get a cached CanSee result.
+        /// </summary>
+        public static bool TryGet(SharedQueryKey key, out bool canSee)
+        {
+            return s_cache.TryGet<bool>(key, out canSee);
+        }
+
+        /// <summary>
+        /// Get-or-add a computed CanSee result. compute() runs only on miss and must be safe to call on main thread.
+        /// </summary>
+        public static bool GetOrAdd(SharedQueryKey key, Func<bool> compute)
+        {
+            return s_cache.GetOrAdd<bool>(key, compute);
+        }
+
+        /// <summary>
+        /// Optional maintenance call; call from a low-frequency tick to clear expired entries.
+        /// </summary>
+        public static void CleanupExpired() => s_cache.CleanupExpired();
+    }
+}

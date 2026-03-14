@@ -1,0 +1,20 @@
+﻿// MoveEntityHeadedShortCircuitPatch.cs
+// COMPLETELY DISABLED - This patch breaks zombie AI.
+// DO NOT ENABLE - it causes zombies to stand still and not attack.
+
+using HarmonyLib;
+
+// Remove the HarmonyPatch attribute entirely to prevent it from running
+// [HarmonyPatch(typeof(EntityAlive), "MoveEntityHeaded")]  // DISABLED
+public static class MoveEntityHeadedShortCircuitPatch
+{
+    // This patch is intentionally disabled.
+    // The HiveMind steering approach breaks zombie targeting and attack behavior.
+    // Keeping this class for reference only.
+    
+    public static bool Prefix(EntityAlive __instance)
+    {
+        // Always run original method
+        return true;
+    }
+}

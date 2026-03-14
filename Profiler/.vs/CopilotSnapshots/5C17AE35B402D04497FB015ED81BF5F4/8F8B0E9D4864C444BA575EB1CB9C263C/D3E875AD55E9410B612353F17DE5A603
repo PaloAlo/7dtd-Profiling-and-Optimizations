@@ -1,0 +1,357 @@
+﻿// FindPathCachePatch.cs
+//
+// Simplified path caching - patches EntityAlive.FindPath to cache at the entity level.
+// Uses position-based keys with TTL eviction.
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntityAlive), "FindPath")]
+static class FindPathCachePatch
+{
+    // Simple per-entity last-path-request throttle (skip redundant requests)
+    private static readonly Dictionary<int, PathRequestInfo> s_lastRequest = new Dictionary<int, PathRequestInfo>(256);
+    private static double s_lastLogTime = 0;
+    private static double s_lastPathStoreLogUtc = 0;
+
+    private struct PathRequestInfo
+    {
+        public Vector3 TargetPos;
+        public float Speed;
+        public float Time;
+        public Vector3 EntityPos;  // ADD: entity position at request time
+    }
+
+    // Immutable snapshot stored in the cache (safe to reuse)
+    private class PathSnapshot
+    {
+        public Vector3[] points;         // projected locations of path nodes
+        public Vector3 rawEndPos;
+        public Vector3 targetPos;
+        public Vector3 startPos;
+        public bool hasStart;
+        public float speed;
+        public bool canBreak;
+        public object aiTask;            // stored as object; forwarded when reconstructing
+    }
+
+    // Build a deterministic cache key from start/end + speed + canBreak.
+    // Keep format consistent with log diagnostics: "sx:sz->ex:ez|s{speedRounded}|b{0/1}"
+    private static string BuildCacheKey(Vector3 start, Vector3 end, float speed, bool canBreak)
+    {
+        int sx = Mathf.FloorToInt(start.x);
+        int sz = Mathf.FloorToInt(start.z);
+        int ex = Mathf.FloorToInt(end.x);
+        int ez = Mathf.FloorToInt(end.z);
+        int sSpeed = Mathf.RoundToInt(speed);
+        int b = canBreak ? 1 : 0;
+        return $"{sx}:{sz}->{ex}:{ez}|s{sSpeed}|b{b}";
+    }
+
+    // Prefix: throttle redundant path requests to same destination
+    public static bool Prefix(EntityAlive __instance, Vector3 targetPos, float moveSpeed, bool canBreak, EAIBase behavior)
+    {
+        if (!ProfilerConfig.Current.EnablePathCache) return true;
+        if (__instance == null) return true;
+
+        try
+        {
+            int entityId = __instance.entityId;
+            float now = Time.realtimeSinceStartup;
+            float ttl = ProfilerConfig.Current.PathCacheTTLSeconds;
+
+            // Check if we recently requested a path to approximately the same location
+            if (s_lastRequest.TryGetValue(entityId, out var lastReq))
+            {
+                float timeDiff = now - lastReq.Time;
+                
+                // Within TTL window?
+                if (timeDiff < ttl)
+                {
+                    // Same target (within 1 unit)?
+                    float distSq = (targetPos - lastReq.TargetPos).sqrMagnitude;
+                    if (distSq < 1f && Mathf.Approximately(moveSpeed, lastReq.Speed))
+                    {
+                        // Skip redundant request
+                        ProfilingUtils.PerFrameCounters.Increment("PathCache.Hit");
+                        return false;
+                    }
+
+                    // Skip if neither entity nor target moved significantly
+                    float entityMovedSq = (__instance.position - lastReq.EntityPos).sqrMagnitude;
+                    float targetMovedSq = (targetPos - lastReq.TargetPos).sqrMagnitude;
+                    const float MIN_MOVE_SQ = 1f; // 1 meter squared
+
+                    if (entityMovedSq < MIN_MOVE_SQ && targetMovedSq < MIN_MOVE_SQ)
+                    {
+                        ProfilingUtils.PerFrameCounters.Increment("PathCache.Hit");
+                        return false; // Skip - nothing moved
+                    }
+                }
+            }
+
+            // Record this request
+            s_lastRequest[entityId] = new PathRequestInfo
+            {
+                TargetPos = targetPos,
+                Speed = moveSpeed,
+                Time = now,
+                EntityPos = __instance.position // ADD: record entity position
+            };
+            ProfilingUtils.PerFrameCounters.Increment("PathCache.Miss");
+
+            // Throttled log
+            double nowUtc = DateTime.UtcNow.ToOADate();
+            if (nowUtc - s_lastLogTime > 5.0)
+            {
+                s_lastLogTime = nowUtc;
+                LogUtil.Debug($"PathCache: {s_lastRequest.Count} entities tracked");
+            }
+        }
+        catch
+        {
+            // On any error, run original
+        }
+
+        return true;
+    }
+
+    // Cleanup stale entries periodically
+    public static void CleanupStale()
+    {
+        float now = Time.realtimeSinceStartup;
+        float ttl = ProfilerConfig.Current.PathCacheTTLSeconds * 2f;
+        
+        var keysToRemove = new List<int>();
+        foreach (var kvp in s_lastRequest)
+        {
+            if (now - kvp.Value.Time > ttl)
+                keysToRemove.Add(kvp.Key);
+        }
+        foreach (var k in keysToRemove)
+            s_lastRequest.Remove(k);
+    }
+
+    public static void OnEntityRemoved(int entityId)
+    {
+        s_lastRequest.Remove(entityId);
+    }
+
+    public static void Clear()
+    {
+        s_lastRequest.Clear();
+    }
+
+    private static void TryStorePath(object resultObj)
+    {
+        try
+        {
+            if (!ProfilerConfig.Current.EnablePathCache) return;
+            if (resultObj == null) return;
+
+            var resultType = resultObj.GetType();
+
+            // Attempt to find 'path' field which likely contains PathEntity
+            var pathField = resultType.GetField("path", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var speedField = resultType.GetField("speed", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+            object pathEntityObj = null;
+            if (pathField != null) pathEntityObj = pathField.GetValue(resultObj);
+
+            // If we couldn't find a pathEntity on the result, dump detailed reflection diagnostics (throttled)
+            if (pathEntityObj == null)
+            {
+                try
+                {
+                    var now = DateTime.UtcNow.ToOADate();
+                    if (now - s_lastPathStoreLogUtc > 1.0)
+                    {
+                        s_lastPathStoreLogUtc = now;
+
+                        var fieldNames = resultType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                                                   .Select(f => $"{f.Name}:{f.FieldType.Name}");
+                        var propNames = resultType.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                                                  .Select(p => $"{p.Name}:{p.PropertyType.Name}");
+
+                        // Try to sample a few field values safely (only primitives, strings, Vector3, arrays lengths)
+                        var sampleList = new List<string>();
+                        var fields = resultType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        int sampleLimit = Math.Min(fields.Length, 8);
+                        for (int i = 0; i < sampleLimit; i++)
+                        {
+                            try
+                            {
+                                var f = fields[i];
+                                object val = f.GetValue(resultObj);
+                                if (val == null)
+                                {
+                                    sampleList.Add($"{f.Name}=null");
+                                    continue;
+                                }
+
+                                Type ft = f.FieldType;
+                                if (ft.IsPrimitive || ft == typeof(string) || ft == typeof(decimal))
+                                {
+                                    sampleList.Add($"{f.Name}={val}");
+                                }
+                                else if (ft == typeof(Vector3))
+                                {
+                                    var v = (Vector3)val;
+                                    sampleList.Add($"{f.Name}=({v.x:F2},{v.y:F2},{v.z:F2})");
+                                }
+                                else if (ft.IsArray)
+                                {
+                                    var arr = val as Array;
+                                    sampleList.Add($"{f.Name}=Array[{(arr != null ? arr.Length.ToString() : "unknown")}] of {ft.GetElementType()?.Name}");
+                                }
+                                else
+                                {
+                                    // don't call ToString() for arbitrary heavy types, just log the type name
+                                    sampleList.Add($"{f.Name}=({ft.Name})");
+                                }
+                            }
+                            catch (Exception exField)
+                            {
+                                sampleList.Add($"ERR:{exField.GetType().Name}");
+                            }
+                        }
+
+                        // Compose and emit diagnostic message
+                        string msg = "FindPathCachePatch TryStorePath: " +
+                                     $"resultType={resultType.FullName}, " +
+                                     $"pathField={(pathField != null ? pathField.Name : "null")}, " +
+                                     $"fields=[{string.Join(", ", fieldNames)}], " +
+                                     $"props=[{string.Join(", ", propNames)}], " +
+                                     $"samples=[{string.Join(", ", sampleList)}]";
+
+                        Log.Out(msg);
+                    }
+                }
+                catch { /* swallow diagnostics errors */ }
+                return;
+            }
+
+            var snapshot = new PathSnapshot();
+
+            // Try to read targetPos from result object
+            var targetField = resultType.GetField("targetPos", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                              ?? resultType.GetField("toPos", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                              ?? resultType.GetField("rawEndPos", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+            if (targetField != null && targetField.FieldType == typeof(Vector3))
+            {
+                snapshot.targetPos = (Vector3)targetField.GetValue(resultObj);
+            }
+
+            // Speed
+            if (speedField != null && speedField.FieldType == typeof(float))
+            {
+                snapshot.speed = (float)speedField.GetValue(resultObj);
+            }
+
+            // canBreak try
+            var canBreakField = resultType.GetField("canBreakBlocks", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                               ?? resultType.GetField("canBreak", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (canBreakField != null && canBreakField.FieldType == typeof(bool))
+            {
+                snapshot.canBreak = (bool)canBreakField.GetValue(resultObj);
+            }
+
+            // aiTask (optional)
+            var aiField = resultType.GetField("aiTask", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (aiField != null)
+            {
+                snapshot.aiTask = aiField.GetValue(resultObj);
+            }
+
+            // Try to extract startPos if available on PathInfo
+            var startField = resultType.GetField("startPos", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (startField != null && startField.FieldType == typeof(Vector3))
+            {
+                snapshot.startPos = (Vector3)startField.GetValue(resultObj);
+                snapshot.hasStart = true;
+            }
+
+            // Extract points from pathEntityObj
+            var peType = pathEntityObj.GetType();
+            var pointsField = peType.GetField("points", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var rawEndField = peType.GetField("rawEndPos", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                           ?? peType.GetField("toPos", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+            if (rawEndField != null && rawEndField.FieldType == typeof(Vector3))
+            {
+                snapshot.rawEndPos = (Vector3)rawEndField.GetValue(pathEntityObj);
+            }
+
+            if (pointsField != null)
+            {
+                var arr = pointsField.GetValue(pathEntityObj) as Array;
+                if (arr != null)
+                {
+                    int n = arr.Length;
+                    snapshot.points = new Vector3[n];
+                    // each element likely has field 'projectedLocation'
+                    for (int i = 0; i < n; i++)
+                    {
+                        var elem = arr.GetValue(i);
+                        if (elem == null) continue;
+                        var elemType = elem.GetType();
+                        var projField = elemType.GetField("projectedLocation", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (projField != null && projField.FieldType == typeof(Vector3))
+                        {
+                            snapshot.points[i] = (Vector3)projField.GetValue(elem);
+                        }
+                        else
+                        {
+                            // fallback: try property names
+                            var projProp = elemType.GetProperty("projectedLocation", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                            if (projProp != null && projProp.PropertyType == typeof(Vector3))
+                            {
+                                snapshot.points[i] = (Vector3)projProp.GetValue(elem);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // If we have at least a raw end or points, build key and store snapshot
+            if ((snapshot.points != null && snapshot.points.Length > 0) || snapshot.rawEndPos != Vector3.zero)
+            {
+                // targetPos fallback
+                if (snapshot.targetPos == Vector3.zero && snapshot.points != null && snapshot.points.Length > 0)
+                {
+                    snapshot.targetPos = snapshot.points[snapshot.points.Length - 1];
+                }
+
+                // Build cache key using target+start/speed/canBreak as in BuildCacheKey
+                Vector3 startKey = snapshot.hasStart ? snapshot.startPos : Vector3.zero;
+                Vector3 endKey = snapshot.targetPos;
+                string key = BuildCacheKey(startKey, endKey, snapshot.speed, snapshot.canBreak);
+                PathCache.Add(key, snapshot);
+
+                // record a store
+                try { ProfilingUtils.PerFrameCounters.Increment("PathCache.Store"); } catch { }
+
+                // throttled diagnostic: storing to cache
+                try
+                {
+                    var now2 = DateTime.UtcNow.ToOADate();
+                    if (now2 - s_lastPathStoreLogUtc > 1.0)
+                    {
+                        s_lastPathStoreLogUtc = now2;
+                        Log.Out($"FindPathCachePatch stored path key={key}");
+                    }
+                }
+                catch { }
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"FindPathCachePatch TryStorePath failed: {e}");
+        }
+    }
+}

@@ -1,0 +1,98 @@
+﻿// PathCache.cs
+
+using System;
+using System.Collections.Generic;
+
+/// <summary>
+/// Lightweight thread-safe path cache scaffolding.
+/// Store arbitrary "path" objects (use actual Path type when integrating).
+/// TTL-based eviction. Intended to be used by a patched pathfinder call-site.
+/// </summary>
+static class PathCache
+{
+    class Entry
+    {
+        public object Path;
+        public double Timestamp; // seconds
+    }
+
+    static readonly Dictionary<string, Entry> cache = new Dictionary<string, Entry>();
+    static readonly object cacheLock = new object();
+
+    static double NowSeconds => DateTime.UtcNow.Subtract(DateTime.UnixEpoch).TotalSeconds;
+
+    // Public Init method so callers (ModInit) can initialize/cache warm if desired.
+    // Currently a no-op, preserved to avoid breaking startup call sites.
+    public static void Init()
+    {
+        // Intentionally left minimal — available for future warm-up logic.
+    }
+
+    public static bool TryGet(string key, out object path, double ttlSeconds)
+    {
+        lock (cacheLock)
+        {
+            if (cache.TryGetValue(key, out var e))
+            {
+                if (NowSeconds - e.Timestamp <= ttlSeconds)
+                {
+                    path = e.Path;
+                    return true;
+                }
+                else
+                {
+                    cache.Remove(key);
+                }
+            }
+        }
+        path = null;
+        return false;
+    }
+
+    public static void Add(string key, object path)
+    {
+        lock (cacheLock)
+        {
+            cache[key] = new Entry { Path = path, Timestamp = NowSeconds };
+        }
+    }
+
+    public static void Clear() { lock (cacheLock) cache.Clear(); }
+
+    // Returns current number of cached entries (thread-safe)
+    public static int Count
+    {
+        get
+        {
+            lock (cacheLock) return cache.Count;
+        }
+    }
+
+    // Remove entries older than ttlSeconds and return removed count
+    public static int ClearStale(double ttlSeconds)
+    {
+        var removed = 0;
+        lock (cacheLock)
+        {
+            var now = NowSeconds;
+            var keys = new List<string>(cache.Keys);
+            foreach (var k in keys)
+            {
+                if (now - cache[k].Timestamp > ttlSeconds)
+                {
+                    cache.Remove(k);
+                    removed++;
+                }
+            }
+        }
+        return removed;
+    }
+
+    // No-op for entity removal - PathCache uses string keys, not entity IDs
+    // FindPathCachePatch handles its own per-entity cleanup
+    public static void OnEntityRemoved(int entityId)
+    {
+        // PathCache uses string keys (position-based), not entity IDs
+        // Actual cleanup is done by FindPathCachePatch.OnEntityRemoved
+    }
+}

@@ -1,0 +1,124 @@
+﻿// MoveEntityHeadedLODPatch.cs
+//
+// Aggressive LOD-based throttling for EntityAlive.MoveEntityHeaded
+// Now includes emergency throttling when zombie count is high
+// FIX: Combat-engaged entities ALWAYS get full movement updates regardless of zombie count.
+
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntityAlive), nameof(EntityAlive.MoveEntityHeaded))]
+public static class MoveEntityHeadedLODPatch
+{
+    private static readonly Dictionary<int, int> s_lastUpdateFrame = new Dictionary<int, int>(256);
+
+    public static bool Prefix(EntityAlive __instance, Vector3 _direction, bool _isDirAbsolute)
+    {
+        if (!ProfilerConfig.Current.EnableMoveLOD) return true;
+        if (__instance == null) return true;
+
+        // NEVER throttle players
+        if (__instance is EntityPlayer) return true;
+
+        // AI toggle: stop all enemy movement immediately
+        if (GamePrefs.GetBool(EnumGamePrefs.DebugStopEnemiesMoving))
+            return false;
+
+        try
+        {
+            // ALWAYS allow combat-engaged entities full movement
+            // This prevents stop-and-go stuttering for active zombies
+            if (IsCombatOrStateActive(__instance)) return true;
+
+            int entityId = __instance.entityId;
+            int currentFrame = Time.frameCount;
+
+            FrameCache.EnsureUpdated();
+            float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
+
+            float tier1Sq = ProfilerConfig.Current.MoveLODTier1DistSq;
+            float tier2Sq = ProfilerConfig.Current.MoveLODTier2DistSq;
+            float tier3Sq = ProfilerConfig.Current.MoveLODTier3DistSq;
+
+            // Check if we're in emergency mode (many zombies) — adaptive thresholds
+            int zombieCount = FrameCache.ZombieCount;
+            bool emergencyMode = zombieCount >= AdaptiveThresholds.EmergencyZombieThreshold;
+            bool criticalMode = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
+
+            // Tier 0 (very close) - ALWAYS run full update (never reduce this threshold)
+            if (distSq < tier1Sq)
+            {
+                return true;
+            }
+
+            // Calculate skip interval based on distance AND zombie count
+            int skipInterval;
+            if (distSq < tier2Sq)
+            {
+                // 30-50m: moderate throttle only in emergency
+                skipInterval = criticalMode ? 3 : (emergencyMode ? 2 : 1);
+            }
+            else if (distSq < tier3Sq)
+            {
+                // 50-80m: heavier throttle
+                skipInterval = criticalMode ? 5 : (emergencyMode ? 4 : 3);
+            }
+            else
+            {
+                // >80m: heaviest throttle
+                skipInterval = criticalMode ? 8 : (emergencyMode ? 6 : 5);
+            }
+
+            if (skipInterval <= 1) return true;
+
+            // Frame-slicing: distribute updates across frames
+            int frameSlot = currentFrame % skipInterval;
+            int entitySlot = (entityId & 0x7FFFFFFF) % skipInterval;
+
+            if (frameSlot == entitySlot)
+            {
+                s_lastUpdateFrame[entityId] = currentFrame;
+                return true;
+            }
+
+            ProfilingUtils.PerFrameCounters.Increment("MoveEntityHeaded.LODSkipped");
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Returns true if the entity is in any state that requires full movement updates.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsCombatOrStateActive(EntityAlive entity)
+    {
+        if (entity.GetAttackTarget() != null) return true;
+        if (entity.GetRevengeTarget() != null) return true;
+        if (entity.hasBeenAttackedTime > 0) return true;
+        if (entity.isAlert) return true;
+        if (entity.IsSleeping) return true;
+        if (entity.HasInvestigatePosition) return true;
+        return false;
+    }
+
+    public static void OnEntityRemoved(int entityId)
+    {
+        s_lastUpdateFrame.Remove(entityId);
+    }
+}
+
+// Extension kept for compatibility
+public static class EntityAliveExtensions
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool HasAttackTarget(this EntityAlive entity)
+    {
+        return entity.GetAttackTarget() != null;
+    }
+}

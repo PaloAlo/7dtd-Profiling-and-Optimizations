@@ -1,0 +1,157 @@
+﻿// FastAccessors.cs
+
+using System;
+using System.Collections.Concurrent;
+using System.Linq.Expressions;
+using System.Reflection;
+using UnityEngine;
+
+internal static class FastAccessors
+{
+    private static readonly ConcurrentDictionary<Type, Func<object, int>> EntityIdGetters = new();
+    private static readonly ConcurrentDictionary<Type, Func<object, Vector3>> PositionGetters = new();
+
+    // Try get entity id quickly. Returns false if no fast accessor available.
+    public static bool TryGetEntityId(object instance, out int id)
+    {
+        id = -1;
+        if (instance == null) return false;
+        var t = instance.GetType();
+
+        if (!EntityIdGetters.TryGetValue(t, out var getter))
+        {
+            getter = BuildEntityIdGetter(t);
+            // store even if null to avoid repeated reflection attempts
+            EntityIdGetters[t] = getter;
+        }
+
+        if (getter == null) return false;
+        try
+        {
+            id = getter(instance);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    // Try get a Vector3 position quickly.
+    public static bool TryGetPosition(object instance, out Vector3 pos)
+    {
+        pos = Vector3.zero;
+        if (instance == null) return false;
+        var t = instance.GetType();
+
+        if (!PositionGetters.TryGetValue(t, out var getter))
+        {
+            getter = BuildPositionGetter(t);
+            PositionGetters[t] = getter;
+        }
+
+        if (getter == null) return false;
+        try
+        {
+            pos = getter(instance);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    // Build delegate for entity id: prefer field "entityId" then properties
+    private static Func<object, int> BuildEntityIdGetter(Type t)
+    {
+        // Try common field names
+        var f = t.GetField("entityId", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        if (f != null && f.FieldType == typeof(int))
+            return BuildFieldIntGetter(t, f);
+
+        // Try common property names
+        var p = t.GetProperty("EntityID", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+             ?? t.GetProperty("entityId", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+             ?? t.GetProperty("ID", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+        if (p != null && (p.PropertyType == typeof(int) || p.PropertyType == typeof(long)))
+            return BuildPropertyIntGetter(t, p);
+
+        return null;
+    }
+
+    private static Func<object, int> BuildFieldIntGetter(Type t, FieldInfo f)
+    {
+        var param = Expression.Parameter(typeof(object), "o");
+        var cast = Expression.Convert(param, t);
+        var fieldAccess = Expression.Field(cast, f);
+        var convert = Expression.Convert(fieldAccess, typeof(int));
+        var lambda = Expression.Lambda<Func<object, int>>(convert, param);
+        return lambda.Compile();
+    }
+
+    private static Func<object, int> BuildPropertyIntGetter(Type t, PropertyInfo p)
+    {
+        var param = Expression.Parameter(typeof(object), "o");
+        var cast = Expression.Convert(param, t);
+        var propAccess = Expression.Property(cast, p);
+        var convert = Expression.Convert(propAccess, typeof(int));
+        var lambda = Expression.Lambda<Func<object, int>>(convert, param);
+        return lambda.Compile();
+    }
+
+    // Build delegate for Vector3 position. Try field/property "position", then transform.position
+    private static Func<object, Vector3> BuildPositionGetter(Type t)
+    {
+        var f = t.GetField("position", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        if (f != null && f.FieldType == typeof(Vector3))
+            return BuildFieldVec3Getter(t, f);
+
+        var p = t.GetProperty("position", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+             ?? t.GetProperty("Position", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+        if (p != null && p.PropertyType == typeof(Vector3))
+            return BuildPropertyVec3Getter(t, p);
+
+        // Try transform.position: entity.transform.position
+        var transformProp = t.GetProperty("transform", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        if (transformProp != null)
+        {
+            var trType = transformProp.PropertyType;
+            var posProp = trType.GetProperty("position", BindingFlags.Instance | BindingFlags.Public);
+            if (posProp != null && posProp.PropertyType == typeof(Vector3))
+                return BuildTransformPositionGetter(t, transformProp, posProp);
+        }
+
+        return null;
+    }
+
+    private static Func<object, Vector3> BuildFieldVec3Getter(Type t, FieldInfo f)
+    {
+        var param = Expression.Parameter(typeof(object), "o");
+        var cast = Expression.Convert(param, t);
+        var fieldAccess = Expression.Field(cast, f);
+        var lambda = Expression.Lambda<Func<object, Vector3>>(fieldAccess, param);
+        return lambda.Compile();
+    }
+
+    private static Func<object, Vector3> BuildPropertyVec3Getter(Type t, PropertyInfo p)
+    {
+        var param = Expression.Parameter(typeof(object), "o");
+        var cast = Expression.Convert(param, t);
+        var propAccess = Expression.Property(cast, p);
+        var lambda = Expression.Lambda<Func<object, Vector3>>(propAccess, param);
+        return lambda.Compile();
+    }
+
+    private static Func<object, Vector3> BuildTransformPositionGetter(Type t, PropertyInfo transformProp, PropertyInfo posProp)
+    {
+        var param = Expression.Parameter(typeof(object), "o");
+        var cast = Expression.Convert(param, t);
+        var transformAccess = Expression.Property(cast, transformProp);
+        var posAccess = Expression.Property(transformAccess, posProp);
+        var lambda = Expression.Lambda<Func<object, Vector3>>(posAccess, param);
+        return lambda.Compile();
+    }
+}

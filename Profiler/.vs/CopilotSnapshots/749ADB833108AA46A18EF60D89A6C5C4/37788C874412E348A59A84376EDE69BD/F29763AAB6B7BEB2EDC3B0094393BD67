@@ -1,0 +1,62 @@
+﻿// SpatialGrid.cs
+
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+// Lightweight spatial hash for coarse neighbor queries.
+// Use for grouping / LOD: insert entity id + position once per Hive update, query neighbors by radius.
+internal class SpatialGrid<TId>
+{
+    private readonly float _cellSize;
+    private readonly Dictionary<long, List<TId>> _cells = new();
+    private readonly Func<TId, Vector3> _posGetter;
+
+    public SpatialGrid(float cellSize, Func<TId, Vector3> posGetter)
+    {
+        _cellSize = Math.Max(0.1f, cellSize);
+        _posGetter = posGetter ?? throw new ArgumentNullException(nameof(posGetter));
+    }
+
+    private long KeyFor(Vector3 p)
+    {
+        long ix = (long)Math.Floor(p.x / _cellSize);
+        long iy = (long)Math.Floor(p.z / _cellSize); // use XZ plane
+        return (ix << 32) ^ (iy & 0xFFFFFFFF);
+    }
+
+    public void Clear() => _cells.Clear();
+
+    public void Insert(TId id)
+    {
+        var p = _posGetter(id);
+        var k = KeyFor(p);
+        if (!_cells.TryGetValue(k, out var list))
+        {
+            list = new List<TId>();
+            _cells[k] = list;
+        }
+        list.Add(id);
+    }
+
+    // Query approximate neighbors within radius; may include some extra from adjacent cells.
+    public void Query(Vector3 center, float radius, List<TId> outList)
+    {
+        outList.Clear();
+        int r = (int)Math.Ceiling(radius / _cellSize);
+        var cx = (long)Math.Floor(center.x / _cellSize);
+        var cz = (long)Math.Floor(center.z / _cellSize);
+        float r2 = radius * radius;
+        for (long ix = cx - r; ix <= cx + r; ix++)
+        for (long iz = cz - r; iz <= cz + r; iz++)
+        {
+            var k = (ix << 32) ^ (iz & 0xFFFFFFFF);
+            if (!_cells.TryGetValue(k, out var bucket)) continue;
+            foreach (var id in bucket)
+            {
+                var p = _posGetter(id);
+                if ((p - center).sqrMagnitude <= r2) outList.Add(id);
+            }
+        }
+    }
+}

@@ -1,0 +1,167 @@
+﻿// FindPathCachePatch.cs
+//
+// Hive-mind path sharing: zombies in the same spatial cell targeting the same
+// entity reuse a single A* result. On cache hit the Prefix builds a PathEntity
+// from cached waypoints, wraps it in a PathInfo, and calls navigator.SetPath()
+// directly -- skipping the PathFinderThread queue entirely.
+//
+// ImprovePath() inside SetPath adjusts the first waypoint to the receiving
+// zombie's actual position, giving a natural "join the shared path" effect.
+//
+// Also keeps the lightweight per-entity duplicate-request throttle.
+
+using System;
+using System.Collections.Generic;
+using GamePath;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntityAlive), "FindPath")]
+static class FindPathCachePatch
+{
+    private static readonly Dictionary<int, PathRequestInfo> s_lastRequest =
+        new Dictionary<int, PathRequestInfo>(256);
+
+    private struct PathRequestInfo
+    {
+        public Vector3 TargetPos;
+        public float Speed;
+        public float Time;
+        public Vector3 EntityPos;
+    }
+
+    public static bool Prefix(EntityAlive __instance, Vector3 targetPos, float moveSpeed,
+                              bool canBreak, EAIBase behavior)
+    {
+        if (!ProfilerConfig.Current.EnablePathCache) return true;
+        if (__instance == null) return true;
+
+        try
+        {
+            int entityId = __instance.entityId;
+            float now = Time.realtimeSinceStartup;
+            float ttl = ProfilerConfig.Current.PathCacheTTLSeconds;
+
+            // --- Per-entity duplicate-request throttle (cheap) ---
+            if (s_lastRequest.TryGetValue(entityId, out var lastReq))
+            {
+                float timeDiff = now - lastReq.Time;
+                if (timeDiff < ttl)
+                {
+                    float distSq = (targetPos - lastReq.TargetPos).sqrMagnitude;
+                    if (distSq < 1f && Mathf.Approximately(moveSpeed, lastReq.Speed))
+                    {
+                        ProfilingUtils.PerFrameCounters.Increment("PathCache.Hit");
+                        return false;
+                    }
+
+                    float entityMovedSq = (__instance.position - lastReq.EntityPos).sqrMagnitude;
+                    float targetMovedSq = (targetPos - lastReq.TargetPos).sqrMagnitude;
+                    if (entityMovedSq < 1f && targetMovedSq < 1f)
+                    {
+                        ProfilingUtils.PerFrameCounters.Increment("PathCache.Hit");
+                        return false;
+                    }
+                }
+            }
+
+            // --- Hive-mind spatial cache lookup ---
+            EntityAlive attackTarget = __instance.GetAttackTarget();
+            if (attackTarget != null)
+            {
+                int targetId = attackTarget.entityId;
+
+                if (PathCache.TryGetSharedPath(targetId, __instance.position, targetPos,
+                        canBreak, out var waypoints, out var rawEndPos))
+                {
+                    if (TryInjectSharedPath(__instance, targetPos, moveSpeed, canBreak,
+                                            behavior, waypoints, rawEndPos))
+                    {
+                        s_lastRequest[entityId] = new PathRequestInfo
+                        {
+                            TargetPos = targetPos,
+                            Speed = moveSpeed,
+                            Time = now,
+                            EntityPos = __instance.position
+                        };
+                        ProfilingUtils.PerFrameCounters.Increment("PathCache.Hit");
+                        ProfilingUtils.PerFrameCounters.Increment("PathCache.HiveHit");
+                        return false;
+                    }
+                }
+            }
+
+            // --- Cache miss: record request and let original FindPath proceed ---
+            s_lastRequest[entityId] = new PathRequestInfo
+            {
+                TargetPos = targetPos,
+                Speed = moveSpeed,
+                Time = now,
+                EntityPos = __instance.position
+            };
+            ProfilingUtils.PerFrameCounters.Increment("PathCache.Miss");
+        }
+        catch
+        {
+            // On any error fall through to original
+        }
+
+        return true;
+    }
+
+    private static bool TryInjectSharedPath(EntityAlive entity, Vector3 targetPos,
+        float moveSpeed, bool canBreak, EAIBase behavior,
+        Vector3[] waypoints, Vector3 rawEndPos)
+    {
+        try
+        {
+            var navigator = entity.navigator;
+            if (navigator == null) return false;
+
+            var pathEntity = new PathEntity();
+            var pathPoints = new PathPoint[waypoints.Length];
+            for (int i = 0; i < waypoints.Length; i++)
+            {
+                pathPoints[i] = PathPoint.Allocate(waypoints[i]);
+            }
+            pathEntity.SetPoints(pathPoints);
+            pathEntity.toPos = targetPos;
+            pathEntity.rawEndPos = rawEndPos;
+
+            var pathInfo = new PathInfo(entity, targetPos, canBreak, moveSpeed, behavior);
+            pathInfo.state = PathInfo.State.Done;
+            pathInfo.path = pathEntity;
+
+            return navigator.SetPath(pathInfo, moveSpeed);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public static void CleanupStale()
+    {
+        float now = Time.realtimeSinceStartup;
+        float ttl = ProfilerConfig.Current.PathCacheTTLSeconds * 2f;
+
+        var keysToRemove = new List<int>();
+        foreach (var kvp in s_lastRequest)
+        {
+            if (now - kvp.Value.Time > ttl)
+                keysToRemove.Add(kvp.Key);
+        }
+        foreach (var k in keysToRemove)
+            s_lastRequest.Remove(k);
+    }
+
+    public static void OnEntityRemoved(int entityId)
+    {
+        s_lastRequest.Remove(entityId);
+    }
+
+    public static void Clear()
+    {
+        s_lastRequest.Clear();
+    }
+}

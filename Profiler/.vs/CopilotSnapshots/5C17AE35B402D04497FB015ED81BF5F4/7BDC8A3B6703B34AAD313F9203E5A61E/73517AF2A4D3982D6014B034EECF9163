@@ -1,0 +1,138 @@
+﻿// PathCache.cs
+//
+// Hive-mind spatial path cache. Zombies in the same spatial cell targeting
+// the same entity share computed A* path waypoints. When one zombie gets a
+// fresh path from the A* solver, nearby zombies reuse those waypoints instead
+// of queuing redundant calculations.
+
+using System.Collections.Generic;
+using UnityEngine;
+
+static class PathCache
+{
+    struct CacheKey : System.IEquatable<CacheKey>
+    {
+        public int TargetEntityId;
+        public int CellX;
+        public int CellZ;
+
+        public bool Equals(CacheKey other) =>
+            TargetEntityId == other.TargetEntityId && CellX == other.CellX && CellZ == other.CellZ;
+
+        public override int GetHashCode() =>
+            TargetEntityId ^ (CellX * 397) ^ (CellZ * 16777619);
+
+        public override bool Equals(object obj) => obj is CacheKey k && Equals(k);
+    }
+
+    struct CachedPath
+    {
+        public Vector3[] Waypoints;
+        public Vector3 TargetPos;
+        public Vector3 RawEndPos;
+        public float StoredTime;
+        public bool CanBreakBlocks;
+    }
+
+    const float CELL_SIZE = 8f;
+    const float TTL_SECONDS = 1.5f;
+    const float TARGET_TOLERANCE_SQ = 4f; // 2m
+
+    static readonly Dictionary<CacheKey, CachedPath> s_cache = new Dictionary<CacheKey, CachedPath>(128);
+
+    static int ToCell(float v) => Mathf.FloorToInt(v / CELL_SIZE);
+
+    public static void Init() { }
+
+    public static bool TryGetSharedPath(
+        int targetEntityId, Vector3 entityPos, Vector3 requestedTargetPos, bool canBreak,
+        out Vector3[] waypoints, out Vector3 rawEndPos)
+    {
+        waypoints = null;
+        rawEndPos = Vector3.zero;
+
+        var key = new CacheKey
+        {
+            TargetEntityId = targetEntityId,
+            CellX = ToCell(entityPos.x),
+            CellZ = ToCell(entityPos.z)
+        };
+
+        if (!s_cache.TryGetValue(key, out var cached))
+            return false;
+
+        float age = Time.realtimeSinceStartup - cached.StoredTime;
+        if (age > TTL_SECONDS)
+        {
+            s_cache.Remove(key);
+            return false;
+        }
+
+        if ((requestedTargetPos - cached.TargetPos).sqrMagnitude > TARGET_TOLERANCE_SQ)
+            return false;
+
+        if (canBreak != cached.CanBreakBlocks)
+            return false;
+
+        if (cached.Waypoints == null || cached.Waypoints.Length < 2)
+            return false;
+
+        waypoints = cached.Waypoints;
+        rawEndPos = cached.RawEndPos;
+        return true;
+    }
+
+    public static void Store(
+        int targetEntityId, Vector3 entityPos, Vector3 targetPos, bool canBreak,
+        Vector3[] waypoints, Vector3 rawEndPos)
+    {
+        if (waypoints == null || waypoints.Length < 2) return;
+
+        var key = new CacheKey
+        {
+            TargetEntityId = targetEntityId,
+            CellX = ToCell(entityPos.x),
+            CellZ = ToCell(entityPos.z)
+        };
+
+        s_cache[key] = new CachedPath
+        {
+            Waypoints = waypoints,
+            TargetPos = targetPos,
+            RawEndPos = rawEndPos,
+            StoredTime = Time.realtimeSinceStartup,
+            CanBreakBlocks = canBreak
+        };
+    }
+
+    public static void Clear() => s_cache.Clear();
+
+    public static int Count => s_cache.Count;
+
+    public static int ClearStale(double ttlSeconds = 0)
+    {
+        if (ttlSeconds <= 0) ttlSeconds = TTL_SECONDS * 3;
+        float now = Time.realtimeSinceStartup;
+        var toRemove = new List<CacheKey>();
+        foreach (var kvp in s_cache)
+        {
+            if (now - kvp.Value.StoredTime > ttlSeconds)
+                toRemove.Add(kvp.Key);
+        }
+        foreach (var k in toRemove)
+            s_cache.Remove(k);
+        return toRemove.Count;
+    }
+
+    public static void OnEntityRemoved(int entityId)
+    {
+        var toRemove = new List<CacheKey>();
+        foreach (var kvp in s_cache)
+        {
+            if (kvp.Key.TargetEntityId == entityId)
+                toRemove.Add(kvp.Key);
+        }
+        foreach (var k in toRemove)
+            s_cache.Remove(k);
+    }
+}

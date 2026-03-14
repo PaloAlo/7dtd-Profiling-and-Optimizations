@@ -1,0 +1,112 @@
+﻿// SharedQueryCache.cs
+
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+
+namespace Profiler.Patches
+{
+    // Simple spatial/coarse key for caching repeated queries.
+    internal readonly struct SharedQueryKey : IEquatable<SharedQueryKey>
+    {
+        public readonly int cellX;
+        public readonly int cellY;
+        public readonly int cellZ;
+        public readonly int radius;
+        public readonly string queryType;
+
+        public SharedQueryKey(int cellX, int cellY, int cellZ, int radius, string queryType)
+        {
+            this.cellX = cellX;
+            this.cellY = cellY;
+            this.cellZ = cellZ;
+            this.radius = radius;
+            this.queryType = queryType ?? string.Empty;
+        }
+
+        public bool Equals(SharedQueryKey other) =>
+            cellX == other.cellX && cellY == other.cellY && cellZ == other.cellZ &&
+            radius == other.radius && queryType == other.queryType;
+
+        public override bool Equals(object obj) => obj is SharedQueryKey q && Equals(q);
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + cellX;
+                hash = hash * 31 + cellY;
+                hash = hash * 31 + cellZ;
+                hash = hash * 31 + radius;
+                hash = hash * 31 + queryType.GetHashCode();
+                return hash;
+            }
+        }
+    }
+
+    internal sealed class SharedQueryCache
+    {
+        private class Entry
+        {
+            public readonly object Value;
+            public readonly double ExpireAtUtc;
+            public Entry(object value, double expireAtUtc) { Value = value; ExpireAtUtc = expireAtUtc; }
+        }
+
+        private readonly ConcurrentDictionary<SharedQueryKey, Entry> _cache = new ConcurrentDictionary<SharedQueryKey, Entry>();
+        private readonly double _ttlSeconds;
+
+        public SharedQueryCache(double ttlSeconds = 0.25)
+        {
+            _ttlSeconds = Math.Max(0.01, ttlSeconds);
+        }
+
+        // Try retrieve typed cached value
+        public bool TryGet<T>(SharedQueryKey key, out T value)
+        {
+            value = default!;
+            if (_cache.TryGetValue(key, out var e))
+            {
+                if (DateTime.UtcNow.ToOADate() <= e.ExpireAtUtc)
+                {
+                    if (e.Value is T t)
+                    {
+                        value = t;
+                        return true;
+                    }
+                }
+                else
+                {
+                    // expired - remove
+                    _cache.TryRemove(key, out _);
+                }
+            }
+            return false;
+        }
+
+        // Compute-on-miss and store
+        public T GetOrAdd<T>(SharedQueryKey key, Func<T> compute)
+        {
+            if (TryGet<T>(key, out var existing))
+                return existing;
+
+            var result = compute();
+            var expireAt = DateTime.UtcNow.AddSeconds(_ttlSeconds).ToOADate();
+            var entry = new Entry(result!, expireAt);
+            _cache[key] = entry;
+            return result;
+        }
+
+        // Occasional cleanup (call from lower-frequency tick)
+        public void CleanupExpired()
+        {
+            var now = DateTime.UtcNow.ToOADate();
+            foreach (var kv in _cache)
+            {
+                if (kv.Value.ExpireAtUtc <= now)
+                    _cache.TryRemove(kv.Key, out _);
+            }
+        }
+    }
+}

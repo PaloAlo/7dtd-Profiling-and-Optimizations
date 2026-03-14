@@ -1,0 +1,66 @@
+﻿// PathRequestCache.cs
+// Small, thread-safe path request cache foundation (TTL-based). Does not change pathfinding behavior by itself.
+
+using System;
+using System.Collections.Concurrent;
+using UnityEngine;
+
+public static class PathRequestCache
+{
+    private struct CacheEntry
+    {
+        public Vector3 Origin;
+        public Vector3 Target;
+        public long Ts;
+        public object Result;
+    }
+
+    private static readonly ConcurrentDictionary<string, CacheEntry> s_cache = new ConcurrentDictionary<string, CacheEntry>(StringComparer.Ordinal);
+
+    // TTL in milliseconds
+    public static int DefaultTtlMs = 1500;
+
+    // Simple key: discretize origin/target to grid to allow dedupe
+    public static string MakeKey(Vector3 origin, Vector3 target, float cellSize = 2.0f)
+    {
+        int ox = Mathf.RoundToInt(origin.x / cellSize);
+        int oz = Mathf.RoundToInt(origin.z / cellSize);
+        int tx = Mathf.RoundToInt(target.x / cellSize);
+        int tz = Mathf.RoundToInt(target.z / cellSize);
+        return $"{ox},{oz}->{tx},{tz}";
+    }
+
+    public static bool TryGet(string key, out object result)
+    {
+        result = null;
+        if (s_cache.TryGetValue(key, out var e))
+        {
+            var age = (DateTime.UtcNow.Ticks - e.Ts) / TimeSpan.TicksPerMillisecond;
+            if (age <= DefaultTtlMs)
+            {
+                result = e.Result;
+                return true;
+            }
+            else
+            {
+                s_cache.TryRemove(key, out _);
+            }
+        }
+        return false;
+    }
+
+    // Preferred overload: provide origin/target so stored entry is fully populated.
+    public static void Put(string key, Vector3 origin, Vector3 target, object result)
+    {
+        var entry = new CacheEntry { Origin = origin, Target = target, Result = result, Ts = DateTime.UtcNow.Ticks };
+        s_cache[key] = entry;
+    }
+
+    // Backward-compatible shim for callers that don't have origin/target yet.
+    public static void Put(string key, object result)
+    {
+        Put(key, Vector3.zero, Vector3.zero, result);
+    }
+
+    public static void Clear() => s_cache.Clear();
+}

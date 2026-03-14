@@ -1,0 +1,509 @@
+﻿// ProfilerRunner.cs
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Diagnostics;
+using UnityEngine;
+using HarmonyLib;
+
+/// <summary>
+/// Lightweight per-frame profiler runner with automatic high-load capture.
+/// 
+/// KEY FEATURES:
+/// - Periodic CSV summary rows (profile.csv)
+/// - Automatic detailed captures during FPS drops (HIGHLOAD snapshots)
+/// - Deep sub-method instrumentation for root cause analysis
+/// - Baseline tracking to detect "never recovers" pattern
+/// - Master switch via ProfilerConfig.EnableProfiling
+/// </summary>
+public class ProfilerRunner : MonoBehaviour
+{
+    public static ProfilerRunner Instance { get; private set; }
+
+    // Interval in seconds between CSV dumps
+    public float DumpIntervalSeconds = 30f;
+
+    // Thresholds (adjustable)
+    public float SpikeThresholdMs = 50f;
+    public float PerMethodThresholdMs = 10f;
+    public int TopMethodsCount = 5;
+
+    // === HIGH-LOAD AUTOMATIC CAPTURE SETTINGS ===
+    public float LowFpsThreshold = 30f;
+    public int MinZombiesForCapture = 50;
+    public float CaptureDebounceSeconds = 30f;
+    public int MaxHighLoadCaptures = 5;
+
+    // === RECOVERY TRACKING ===
+    public float RecoveryCheckIntervalSeconds = 60f;
+    public float RecoveryFpsThreshold = 0.8f;
+
+    private float _accum = 0f;
+    private float _recoveryAccum = 0f;
+    private string _outPath;
+    private bool _headerWritten;
+
+    // High-load capture tracking
+    private float _lastHighLoadCaptureTime = -999f;
+    private int _highLoadCaptureCount = 0;
+    private float _baselineFps = 60f;
+    private float _peakFps = 0f;
+    private bool _baselineEstablished = false;
+    private readonly Queue<float> _fpsHistory = new Queue<float>();
+    private const int FpsHistorySize = 60;
+
+    // Recovery analysis
+    private int _peakZombieCount = 0;
+    private float _postPeakFps = 0f;
+    private bool _wasInHighLoad = false;
+
+    private bool _dynamicPatchesApplied = false;
+    private bool _deepPatchesApplied = false;
+
+    public static void Init(Mod modInstance)
+    {
+        try
+        {
+            if (Instance != null) return;
+
+            try { ProfilingUtils.ModInstance = modInstance; } catch { /* defensive */ }
+
+            var go = new GameObject("ProfilerRunner");
+            UnityEngine.Object.DontDestroyOnLoad(go);
+            Instance = go.AddComponent<ProfilerRunner>();
+
+            Instance._outPath = ProfilingUtils.ResolveOutputPath("7dtd_profile.csv");
+            Instance._headerWritten = File.Exists(Instance._outPath);
+
+            LogUtil.Info($"ProfilerRunner initialized. Profiling={ProfilerConfig.Current.EnableProfiling}, DumpPath={Instance._outPath}");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"ProfilerRunner.Init failed: {ex.Message}");
+        }
+    }
+
+    private void Update()
+    {
+        bool profilingEnabled = ProfilerConfig.Current.EnableProfiling;
+
+        // Apply dynamic profiling patches only if profiling is enabled
+        if (profilingEnabled && !_dynamicPatchesApplied)
+        {
+            try
+            {
+                var harmony = new Harmony(GetType().ToString());
+                ProfilingUtils.ApplyDynamicPatches(harmony);
+                _dynamicPatchesApplied = true;
+                LogUtil.Debug("ProfilerRunner: dynamic profiling patches applied.");
+            }
+            catch (Exception ex)
+            {
+                LogUtil.Warn($"ProfilerRunner: ApplyDynamicPatches failed: {ex.Message}");
+                _dynamicPatchesApplied = true;
+            }
+        }
+
+        // Apply deep instrumentation patches (deferred to ensure types are loaded)
+        if (profilingEnabled && _dynamicPatchesApplied && !_deepPatchesApplied && Time.frameCount > 100)
+        {
+            try
+            {
+                var harmony = new Harmony(GetType().ToString() + ".Deep");
+                DeepEntityInstrumentation.Apply(harmony);
+                _deepPatchesApplied = true;
+            }
+            catch (Exception ex)
+            {
+                LogUtil.Warn($"ProfilerRunner: DeepEntityInstrumentation failed: {ex.Message}");
+                _deepPatchesApplied = true;
+            }
+        }
+
+        // FPS/zombie tracking always runs (lightweight, needed for high-load detection)
+        TrackFps();
+
+        // Only do profiling work when enabled
+        if (profilingEnabled)
+        {
+            CheckHighLoadCapture();
+            CheckRecoveryPattern();
+
+            _accum += Time.unscaledDeltaTime;
+            if (_accum >= DumpIntervalSeconds)
+            {
+                try { DumpRow(); }
+                catch (Exception ex) { LogUtil.Warn($"ProfilerRunner DumpRow error: {ex.Message}"); }
+                _accum = 0f;
+                ProfilingUtils.Clear();
+                ProfilingUtils.PerFrameCounters.ResetAll();
+            }
+        }
+    }
+
+    private void TrackFps()
+    {
+        if (Time.unscaledDeltaTime <= 0) return;
+
+        var currentFps = 1f / Time.unscaledDeltaTime;
+        _fpsHistory.Enqueue(currentFps);
+
+        while (_fpsHistory.Count > FpsHistorySize)
+            _fpsHistory.Dequeue();
+
+        // Only track peak FPS during normal gameplay frames (ignore teleport/loading)
+        // Teleport frames have extremely low deltaTime resulting in 200+ FPS readings
+        if (currentFps > _peakFps && currentFps < 200f)
+            _peakFps = currentFps;
+
+        var zombieCount = FindZombieCount();
+        if (zombieCount > _peakZombieCount)
+            _peakZombieCount = zombieCount;
+
+        // Establish/refine baseline during good conditions.
+        // Wait at least 120 seconds to skip trader spawn / loading screen FPS.
+        // Allow re-establishment upward if the current average is significantly higher.
+        if (zombieCount < 10 && _fpsHistory.Count >= FpsHistorySize
+            && Time.realtimeSinceStartup > 120f)
+        {
+            var avgFps = _fpsHistory.Average();
+            if (avgFps > 50f)
+            {
+                bool shouldUpdate = !_baselineEstablished
+                    || avgFps > _baselineFps * 1.15f; // update if 15%+ higher
+
+                if (shouldUpdate)
+                {
+                    _baselineFps = avgFps;
+                    AdaptiveThresholds.SetBaselineFps(_baselineFps);
+                    if (!_baselineEstablished)
+                    {
+                        _baselineEstablished = true;
+                        LogUtil.Info($"Baseline FPS: {_baselineFps:F1}");
+                    }
+                    else
+                    {
+                        LogUtil.Info($"Baseline FPS updated: {_baselineFps:F1}");
+                    }
+                }
+            }
+        }
+
+        // Update adaptive emergency thresholds
+        var avgFpsForAdaptive = _fpsHistory.Count > 0 ? _fpsHistory.Average() : 60f;
+        AdaptiveThresholds.Update(avgFpsForAdaptive, zombieCount);
+    }
+
+    /// <summary>
+    /// Track the "never recovers to baseline" pattern.
+    /// </summary>
+    private void CheckRecoveryPattern()
+    {
+        _recoveryAccum += Time.unscaledDeltaTime;
+        if (_recoveryAccum < RecoveryCheckIntervalSeconds) return;
+        _recoveryAccum = 0f;
+
+        if (!_baselineEstablished) return;
+
+        var zombieCount = FindZombieCount();
+        var currentFps = _fpsHistory.Count > 0 ? _fpsHistory.Average() : 60f;
+        var isCurrentlyHighLoad = zombieCount >= MinZombiesForCapture || currentFps < LowFpsThreshold;
+
+        if (_wasInHighLoad && !isCurrentlyHighLoad && zombieCount < 20)
+        {
+            _postPeakFps = currentFps;
+            var recoveryRatio = currentFps / _baselineFps;
+
+            if (recoveryRatio < RecoveryFpsThreshold)
+            {
+                LogUtil.Warn($"RECOVERY ISSUE: Post-peak FPS={currentFps:F1} vs Baseline={_baselineFps:F1} ({recoveryRatio * 100:F0}% recovered). Peak zombies was {_peakZombieCount}.");
+                CaptureHighLoadDump(zombieCount, currentFps, "RECOVERY_FAIL");
+            }
+            else
+            {
+                LogUtil.Debug($"Recovery OK: {recoveryRatio * 100:F0}% of baseline FPS restored.");
+            }
+
+            _wasInHighLoad = false;
+            _peakZombieCount = 0;
+        }
+
+        if (isCurrentlyHighLoad)
+            _wasInHighLoad = true;
+    }
+
+    private void CheckHighLoadCapture()
+    {
+        if (_highLoadCaptureCount >= MaxHighLoadCaptures) return;
+
+        var timeSinceLastCapture = Time.realtimeSinceStartup - _lastHighLoadCaptureTime;
+        if (timeSinceLastCapture < CaptureDebounceSeconds) return;
+
+        var zombieCount = FindZombieCount();
+        if (zombieCount < MinZombiesForCapture) return;
+
+        var currentFps = _fpsHistory.Count > 0 ? _fpsHistory.Average() : 60f;
+        var fpsDroppedSignificantly = _baselineEstablished && currentFps < _baselineFps * 0.5f;
+        var fpsBelowThreshold = currentFps < LowFpsThreshold;
+
+        if (fpsBelowThreshold || fpsDroppedSignificantly)
+        {
+            CaptureHighLoadDump(zombieCount, currentFps, fpsBelowThreshold ? "LOW_FPS" : "FPS_DROP");
+        }
+    }
+
+    private void CaptureHighLoadDump(int zombieCount, float currentFps, string triggerReason)
+    {
+        try
+        {
+            var entries = ProfilingUtils.SnapshotEntries();
+            var counters = ProfilingUtils.PerFrameCounters.SnapshotAndReset();
+            var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+            var fileName = $"7dtd_HIGHLOAD_{triggerReason}_z{zombieCount}_fps{currentFps:F0}_{timestamp}.csv";
+            var path = ProfilingUtils.ResolveOutputPath(fileName);
+
+            var sb = new System.Text.StringBuilder();
+
+            // --- HEADER ---
+            sb.AppendLine($"# HIGH-LOAD CAPTURE: {triggerReason}");
+            sb.AppendLine($"# Timestamp: {DateTime.UtcNow:o}");
+            sb.AppendLine($"# Frame: {Time.frameCount}");
+            sb.AppendLine($"# ZombieCount: {zombieCount}");
+            sb.AppendLine($"# CurrentFPS: {currentFps:F2}");
+            sb.AppendLine($"# BaselineFPS: {_baselineFps:F2}");
+            sb.AppendLine($"# PeakFPS: {_peakFps:F2}");
+            sb.AppendLine($"# FPSDrop%: {(1 - currentFps / _baselineFps) * 100:F1}%");
+            sb.AppendLine($"# PeakZombies: {_peakZombieCount}");
+            sb.AppendLine($"# CaptureNumber: {_highLoadCaptureCount + 1}/{MaxHighLoadCaptures}");
+            sb.AppendLine($"# GC_MB: {GC.GetTotalMemory(false) / 1048576.0:F1}");
+            sb.AppendLine($"# AdaptiveEmergency: {AdaptiveThresholds.EmergencyZombieThreshold}");
+            sb.AppendLine($"# AdaptiveCritical: {AdaptiveThresholds.CriticalZombieThreshold}");
+            sb.AppendLine();
+
+            // --- TIMING DATA ---
+            sb.AppendLine("=== TIMING DATA (sorted by TotalMs) ===");
+            sb.AppendLine("Tag,TotalMs,Calls,AvgMs,PercentOfTotal,Category");
+
+            var totalMs = entries.Values.Sum(e => e.TotalMs);
+            foreach (var kv in entries.OrderByDescending(e => e.Value.TotalMs))
+            {
+                var pct = totalMs > 0 ? (kv.Value.TotalMs / totalMs * 100) : 0;
+                var category = CategorizeTag(kv.Key);
+                sb.AppendLine($"{kv.Key},{kv.Value.TotalMs:F4},{kv.Value.Calls},{kv.Value.AvgMs:F6},{pct:F2}%,{category}");
+            }
+
+            // --- CALL COUNTS ---
+            sb.AppendLine();
+            sb.AppendLine("=== CALL COUNTS ===");
+            sb.AppendLine("Counter,Value");
+            foreach (var kv in counters.OrderByDescending(c => c.Value))
+            {
+                sb.AppendLine($"{kv.Key},{kv.Value}");
+            }
+
+            // --- OPTIMIZATION EFFECTIVENESS ---
+            sb.AppendLine();
+            sb.AppendLine("=== OPTIMIZATION EFFECTIVENESS ===");
+            sb.AppendLine("# Shows how much work our patches skipped vs total calls");
+
+            WriteEffectiveness(sb, counters, "MoveEntityHeaded", "MoveEntityHeaded.LODSkipped", "MoveEntityHeaded.calls");
+            WriteEffectiveness(sb, counters, "updateTasks", "updateTasks.LODSkipped", "updateTasks.calls");
+            WriteEffectiveness(sb, counters, "GetAttackTarget", "GetAttackTarget.CacheHit", "EntityAlive.GetAttackTarget.calls");
+            WriteEffectiveness(sb, counters, "GetRevengeTarget", "GetRevengeTarget.CacheHit", "EntityAlive.GetRevengeTarget.calls");
+            WriteEffectiveness(sb, counters, "EntityCollision", "EntityCollision.Skipped", "EntityCollision.Skipped");
+            WriteEffectiveness(sb, counters, "MoveHelper", "MoveHelper.Throttled", "MoveHelper.Throttled");
+            WriteEffectiveness(sb, counters, "SpeedStrafe", "SpeedStrafe.Throttled", "SpeedStrafe.Throttled");
+            WriteEffectiveness(sb, counters, "EAIManager.Eval", "EAIManager.EvalThrottled", "EAIManager.EvalThrottled");
+            WriteEffectiveness(sb, counters, "SeeCache.Shared", "SeeCache.SharedHit", "SeeCache.SharedHit");
+            WriteEffectiveness(sb, counters, "PlayerTargeting", "PlayerTargeting.Throttled", "PlayerTargeting.Throttled");
+            WriteEffectiveness(sb, counters, "PlayerAimAssist", "PlayerAimAssist.Throttled", "PlayerAimAssist.Throttled");
+
+            // --- GAME CPU COST PER ZOMBIE ---
+            sb.AppendLine();
+            sb.AppendLine("=== GAME CPU COST PER ZOMBIE ===");
+            sb.AppendLine("# How much CPU time (ms) the GAME spends per zombie for each system.");
+            sb.AppendLine("# This is NOT profiling overhead — it is the actual game workload divided by zombie count.");
+            sb.AppendLine("# Lower values = better optimization. Compare across captures to track improvement.");
+            if (zombieCount > 0)
+            {
+                sb.AppendLine($"TotalMs per zombie: {totalMs / zombieCount:F4}");
+                foreach (var kv in entries.Where(e => e.Value.TotalMs > 1).OrderByDescending(e => e.Value.TotalMs).Take(10))
+                {
+                    sb.AppendLine($"{kv.Key}: {kv.Value.TotalMs / zombieCount:F4} ms/zombie");
+                }
+            }
+
+            File.WriteAllText(path, sb.ToString());
+
+            // Clear timing entries so the next capture starts fresh
+            // (counters already cleared by SnapshotAndReset above)
+            ProfilingUtils.Clear();
+
+            _lastHighLoadCaptureTime = Time.realtimeSinceStartup;
+            _highLoadCaptureCount++;
+
+            LogUtil.Info($"HIGH-LOAD #{_highLoadCaptureCount}: {triggerReason} | Z={zombieCount} | FPS={currentFps:F1} | File={fileName}");
+        }
+        catch (Exception ex)
+        {
+            LogUtil.Warn($"ProfilerRunner high-load capture failed: {ex.Message}");
+        }
+    }
+
+    private static void WriteEffectiveness(System.Text.StringBuilder sb, IDictionary<string, long> counters, string label, string skippedKey, string totalKey)
+    {
+        counters.TryGetValue(skippedKey, out var skipped);
+        counters.TryGetValue(totalKey, out var total);
+        if (skipped > 0 || total > 0)
+        {
+            var rate = total > 0 ? (skipped * 100.0 / total) : 0;
+            sb.AppendLine($"{label}: skipped={skipped}, total={total}, rate={rate:F1}%");
+        }
+    }
+
+    private string CategorizeTag(string tag)
+    {
+        var t = tag.ToLowerInvariant();
+        if (t.Contains("playerlocal")) return "PLAYER";
+        if (t.Contains("entityalive") && !t.Contains("player")) return "AI_ENTITY";
+        if (t.Contains("eai") || t.Contains("task")) return "AI_TASK";
+        if (t.Contains("path") || t.Contains("navigate")) return "PATHFINDING";
+        if (t.Contains("see") || t.Contains("sense") || t.Contains("target")) return "SENSING";
+        if (t.Contains("buff") || t.Contains("status")) return "BUFFS";
+        if (t.Contains("move") || t.Contains("physics")) return "MOVEMENT";
+        if (t.Contains("gui") || t.Contains("window")) return "UI";
+        return "OTHER";
+    }
+
+    private void DumpRow()
+    {
+        var entries = ProfilingUtils.SnapshotEntries();
+        var counters = ProfilingUtils.PerFrameCounters.SnapshotAndReset();
+
+        double aiMs = 0, sensesMs = 0, otherMs = 0;
+        foreach (var kv in entries)
+        {
+            var tag = kv.Key;
+            var entryMs = kv.Value.TotalMs;
+            var t = tag.ToLowerInvariant();
+            if (t.Contains("entityalive") || t.Contains(".updateai") || t.Contains("updateai") || t.Contains("eai")) aiMs += entryMs;
+            else if (t.Contains("sense") || t.Contains("los") || t.Contains("lineof") || t.Contains("cansee")) sensesMs += entryMs;
+            else otherMs += entryMs;
+        }
+
+        var zombieCount = FindZombieCount();
+        var totalMs = aiMs + sensesMs + otherMs;
+
+        // Pull useful counters that our patches actually populate
+        counters.TryGetValue("GetAttackTarget.CacheHit", out var targetCacheHits);
+        counters.TryGetValue("GetAttackTarget.CacheMiss", out var targetCacheMisses);
+        counters.TryGetValue("MoveEntityHeaded.LODSkipped", out var moveLodSkipped);
+        counters.TryGetValue("updateTasks.LODSkipped", out var taskLodSkipped);
+        counters.TryGetValue("EntityCollision.Skipped", out var collisionSkipped);
+        counters.TryGetValue("MoveHelper.Throttled", out var moveHelperThrottled);
+        counters.TryGetValue("SpeedStrafe.Throttled", out var speedStrafeThrottled);
+        counters.TryGetValue("EAIManager.EvalThrottled", out var eaiEvalThrottled);
+        counters.TryGetValue("SeeCache.SharedHit", out var seeCacheSharedHits);
+
+        var gcKb = GC.GetTotalMemory(false) / 1024;
+        var currentFps = _fpsHistory.Count > 0 ? _fpsHistory.Average() : 0f;
+
+        var header = "TimeUtc,Frame,ZombieCount,AI_ms,Sensing_ms,Other_ms,TotalMs,GC_kb,CurrentFPS,BaselineFPS,PeakFPS,TargetCacheHits,TargetCacheMisses,MoveLODSkipped,TaskLODSkipped,CollisionSkipped,MoveHelperThrottled,SpeedStrafeThrottled,EAIEvalThrottled,SeeCacheSharedHits,EmergencyThreshold,CriticalThreshold,Top1_Tag,Top1_ms,Top2_Tag,Top2_ms,Top3_Tag,Top3_ms,Top4_Tag,Top4_ms,Top5_Tag,Top5_ms";
+
+        var top = entries.OrderByDescending(kv => kv.Value.TotalMs).Take(TopMethodsCount).ToList();
+
+        var rowParts = new List<string>
+        {
+            DateTime.UtcNow.ToString("o"),
+            Time.frameCount.ToString(),
+            zombieCount.ToString(),
+            aiMs.ToString("F4"),
+            sensesMs.ToString("F4"),
+            otherMs.ToString("F4"),
+            totalMs.ToString("F4"),
+            gcKb.ToString(),
+            currentFps.ToString("F2"),
+            _baselineFps.ToString("F2"),
+            _peakFps.ToString("F2"),
+            targetCacheHits.ToString(),
+            targetCacheMisses.ToString(),
+            moveLodSkipped.ToString(),
+            taskLodSkipped.ToString(),
+            collisionSkipped.ToString(),
+            moveHelperThrottled.ToString(),
+            speedStrafeThrottled.ToString(),
+            eaiEvalThrottled.ToString(),
+            seeCacheSharedHits.ToString(),
+            AdaptiveThresholds.EmergencyZombieThreshold.ToString(),
+            AdaptiveThresholds.CriticalZombieThreshold.ToString()
+        };
+
+        for (int i = 0; i < TopMethodsCount; i++)
+        {
+            if (i < top.Count)
+            {
+                rowParts.Add(EscapeForCsv(top[i].Key));
+                rowParts.Add(top[i].Value.TotalMs.ToString("F4"));
+            }
+            else
+            {
+                rowParts.Add("");
+                rowParts.Add("");
+            }
+        }
+
+        var row = string.Join(",", rowParts);
+
+        try
+        {
+            var dir = Path.GetDirectoryName(_outPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            if (!_headerWritten)
+            {
+                File.AppendAllText(_outPath, header + Environment.NewLine);
+                _headerWritten = true;
+            }
+            File.AppendAllText(_outPath, row + Environment.NewLine);
+        }
+        catch (Exception ex)
+        {
+            LogUtil.Warn($"ProfilerRunner failed to write CSV: {ex.Message}");
+        }
+    }
+
+    private static string EscapeForCsv(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return "";
+        if (s.Contains(",") || s.Contains("\"") || s.Contains("\n"))
+            return "\"" + s.Replace("\"", "\"\"") + "\"";
+        return s;
+    }
+
+    private int FindZombieCount()
+    {
+        try
+        {
+            var gm = GameManager.Instance;
+            if (gm?.World == null) return 0;
+
+            var entities = gm.World.Entities;
+            if (entities == null) return 0;
+
+            int count = 0;
+            var list = entities.list;
+            if (list != null)
+            {
+                for (int i = 0; i < list.Count; i++)
+                {
+                    var e = list[i];
+                    if (e != null && e.IsAlive() && e is EntityEnemy)
+                        count++;
+                }
+            }
+            return count;
+        }
+        catch { return 0; }
+    }
+}

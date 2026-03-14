@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<xml>
+    <Name value="7dtd_Profiler" />
+    <DisplayName value="7dtd_Profiler" />
+    <Description value="profiler to discover bottlenecks in vanilla code" />
+    <Author value="PaLoALo" />
+    <Version value="2.6.0.1" compat="2.6" />
+    <Website value="https://next.nexusmods.com/profile/PaLoALo" />
+	<SkipWithAntiCheat value="false" />
+<!--
+	<Icon value="Textures/Q_logo_icon.png" />
+	<Banner value="Textures/Q_logo_subtle_shadow.png" />
+	<Youtube value="" />
+	<Discord value="" />
+	<Twitter value="" />
+-->
+</xml>

@@ -1,0 +1,63 @@
+﻿// HiveMicroProfiler.cs
+
+using System;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Text;
+using System.Threading;
+
+
+internal static class HiveMicroProfiler
+{
+    private struct Entry
+    {
+        public long TotalTicks;
+        public long Calls;
+    }
+
+    private static readonly ConcurrentDictionary<string, Entry> Stats = new();
+
+    // Low-allocation start: return raw timestamp
+    public static long Start() => Stopwatch.GetTimestamp();
+
+    // End and accumulate into low-overhead counters
+    public static void End(string name, long startTimestamp)
+    {
+        if (string.IsNullOrEmpty(name)) return;
+        long delta = Stopwatch.GetTimestamp() - startTimestamp;
+        Stats.AddOrUpdate(name,
+            _ => new Entry { TotalTicks = delta, Calls = 1 },
+            (_, old) => new Entry { TotalTicks = Interlocked.Add(ref old.TotalTicks, delta), Calls = Interlocked.Increment(ref old.Calls) }
+        );
+    }
+
+    // Log current stats and optionally reset them
+    public static void LogAndReset(bool reset = true)
+    {
+        try
+        {
+            if (Stats.IsEmpty) return;
+            var sb = new StringBuilder();
+            sb.AppendLine("Hive timings (ms):");
+            foreach (var kv in Stats)
+            {
+                var name = kv.Key;
+                var e = kv.Value;
+                if (e.Calls == 0) continue;
+                double ms = (double)e.TotalTicks * 1000.0 / Stopwatch.Frequency;
+                double avg = ms / e.Calls;
+                sb.AppendLine($"  {name}: total={ms:F3} avg={avg:F4} calls={e.Calls}");
+            }
+            Log.Out(sb.ToString());
+        }
+        catch (Exception ex)
+        {
+            LogUtil.Warn($"Log failed: {ex.GetType().Name}: {ex.Message}");
+        }
+        finally
+        {
+            if (reset)
+                Stats.Clear();
+        }
+    }
+}

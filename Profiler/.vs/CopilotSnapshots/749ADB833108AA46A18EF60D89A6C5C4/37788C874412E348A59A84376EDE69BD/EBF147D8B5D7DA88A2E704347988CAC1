@@ -1,0 +1,63 @@
+﻿// PathRequestQueue.cs
+
+using System;
+using System.Collections.Concurrent;
+using System.Threading;
+using UnityEngine;
+
+// Minimal background path compute queue skeleton.
+// Main thread enqueues requests; worker computes path results and enqueues apply actions.
+// NOTE: actual GamePath/PathFinder calls may not be thread-safe — only compute heavy graph ops here if safe.
+internal static class PathRequestQueue
+{
+    private static readonly ConcurrentQueue<Func<object>> s_requests = new();
+    private static readonly ConcurrentQueue<Action> s_onMainThread = new();
+    private static Thread s_worker;
+    private static bool s_running;
+
+    public static void StartWorker()
+    {
+        if (s_running) return;
+        s_running = true;
+        s_worker = new Thread(WorkerLoop) { IsBackground = true, Name = "ProfilerPathWorker" };
+        s_worker.Start();
+    }
+
+    public static void StopWorker()
+    {
+        s_running = false;
+        s_worker?.Join(200);
+    }
+
+    public static void EnqueueRequest(Func<object> computeFunc)
+    {
+        s_requests.Enqueue(computeFunc);
+    }
+
+    // Called from main thread in Update to apply completed actions
+    public static void PumpMainThread()
+    {
+        while (s_onMainThread.TryDequeue(out var action))
+            try { action(); } catch (Exception) { /* swallow small errors to be defensive */ }
+    }
+
+    private static void WorkerLoop()
+    {
+        while (s_running)
+        {
+            if (s_requests.TryDequeue(out var req))
+            {
+                object result = null;
+                try { result = req(); } catch { result = null; }
+                // when compute is done, schedule a no-arg main-thread action to apply result
+                // Implementation detail: capture result in closure passed to main-thread queue.
+                s_onMainThread.Enqueue(() =>
+                {
+                    // user-supplied code should process the result
+                    // e.g. PathCache.Store(key, result)
+                });
+            }
+            else Thread.Sleep(1);
+        }
+    }
+}

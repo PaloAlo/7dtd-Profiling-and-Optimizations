@@ -1,0 +1,97 @@
+// PlayerUpdateThrottlePatch.cs
+//
+// Throttles expensive sub-operations inside EntityPlayerLocal that scale
+// with world complexity. Profiling shows EntityPlayerLocal.Update is 3-10%
+// of total frame time — disproportionate for a single entity.
+//
+// Root cause: Several player sub-systems do heavy work every frame:
+// - BlockRadiusEffectsTick: iterates tile entities across 3 chunks
+// - ShelterFrameUpdate: does multiple physics raycasts per frame
+//
+// We target specific sub-methods rather than the whole Update to preserve
+// responsive player controls (camera, input, movement must always be 
+// frame-accurate).
+
+using HarmonyLib;
+using UnityEngine;
+
+/// <summary>
+/// Throttle EntityPlayerLocal.BlockRadiusEffectsTick — iterates tile entities
+/// across 3 chunks every tick. During large hordes the frame budget is tight;
+/// reducing this to every 2nd-3rd frame is imperceptible (buff application
+/// delay of ~30-50 ms is not noticeable).
+/// </summary>
+[HarmonyPatch(typeof(EntityPlayerLocal), nameof(EntityPlayerLocal.BlockRadiusEffectsTick))]
+public static class PlayerBlockRadiusThrottlePatch
+{
+    private static int s_lastRunFrame = -1;
+
+    public static bool Prefix()
+    {
+        if (!ProfilerConfig.Current.EnableMoveLOD) return true;
+
+        try
+        {
+            int frame = Time.frameCount;
+            FrameCache.EnsureUpdated();
+            int zombieCount = FrameCache.ZombieCount;
+
+            if (zombieCount < AdaptiveThresholds.EmergencyZombieThreshold) return true;
+
+            int interval = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold ? 3 : 2;
+
+            if (frame - s_lastRunFrame >= interval)
+            {
+                s_lastRunFrame = frame;
+                return true;
+            }
+
+            ProfilingUtils.PerFrameCounters.Increment("PlayerBlockRadius.Throttled");
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+}
+
+    /// <summary>
+/// Throttle EntityPlayerLocal.ShelterFrameUpdate — performs multiple physics
+/// raycasts each frame to determine shelter percentage. Safe to reduce
+/// frequency during hordes since shelter status changes slowly.
+/// </summary>
+[HarmonyPatch(typeof(EntityPlayerLocal), nameof(EntityPlayerLocal.ShelterFrameUpdate))]
+public static class PlayerShelterThrottlePatch
+{
+    private static int s_lastRunFrame = -1;
+
+    public static bool Prefix()
+    {
+        if (!ProfilerConfig.Current.EnableMoveLOD) return true;
+
+        try
+        {
+            int frame = Time.frameCount;
+            FrameCache.EnsureUpdated();
+            int zombieCount = FrameCache.ZombieCount;
+
+            if (zombieCount < AdaptiveThresholds.EmergencyZombieThreshold) return true;
+
+            int interval = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold ? 4 : 2;
+
+            if (frame - s_lastRunFrame >= interval)
+            {
+                s_lastRunFrame = frame;
+                return true;
+            }
+
+            ProfilingUtils.PerFrameCounters.Increment("PlayerShelter.Throttled");
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+}

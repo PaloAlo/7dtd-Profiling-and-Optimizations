@@ -1,0 +1,20 @@
+﻿// StaggeredUpdatePatch.cs
+// DISABLED: Was causing zombies to not attack by skipping updateTasks.
+
+using System;
+using HarmonyLib;
+using UnityEngine;
+
+// DISABLED - Remove HarmonyPatch attribute to prevent this from running
+// [HarmonyPatch(typeof(EntityAlive), "updateTasks")]
+public static class StaggeredUpdatePatch
+{
+    // This patch is intentionally disabled.
+    // Skipping updateTasks prevents zombies from acquiring targets.
+    
+    public static bool Prefix(EntityAlive __instance)
+    {
+        // Always run original
+        return true;
+    }
+}

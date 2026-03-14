@@ -1,0 +1,84 @@
+﻿// AdaptiveThresholds.cs
+//
+// Dynamically adjusts emergency/critical zombie thresholds based on current
+// FPS relative to baseline. On powerful hardware with 100+ FPS baseline,
+// we can tolerate more zombies before throttling. On weaker hardware, we
+// kick in throttling earlier to maintain playability.
+//
+// The thresholds are recalculated periodically and exposed as static values
+// that all optimization patches read.
+
+using System.Runtime.CompilerServices;
+using UnityEngine;
+
+public static class AdaptiveThresholds
+{
+    // Default values matching current hardcoded constants
+    public static int EmergencyZombieThreshold { get; private set; } = 40;
+    public static int CriticalZombieThreshold { get; private set; } = 80;
+
+    // Range limits — never go below minimum or above maximum
+    private const int MIN_EMERGENCY = 25;
+    private const int MAX_EMERGENCY = 65;
+    private const int MIN_CRITICAL = 50;
+    private const int MAX_CRITICAL = 120;
+
+    // FPS targets: we want to keep FPS above these
+    private const float TARGET_FPS_FLOOR = 30f;
+    private const float TARGET_FPS_COMFORTABLE = 45f;
+
+    private static float s_baselineFps = 60f;
+    private static float s_lastUpdateTime = -999f;
+    private const float UPDATE_INTERVAL = 10f; // recalculate every 10 seconds
+
+    /// <summary>
+    /// Called by ProfilerRunner when baseline FPS is established or updated.
+    /// </summary>
+    public static void SetBaselineFps(float baseline)
+    {
+        if (baseline > 20f)
+            s_baselineFps = baseline;
+    }
+
+    /// <summary>
+    /// Called each frame (or periodically) to recalculate thresholds based
+    /// on current conditions.
+    /// </summary>
+    public static void Update(float currentFps, int currentZombieCount)
+    {
+        float now = Time.realtimeSinceStartup;
+        if (now - s_lastUpdateTime < UPDATE_INTERVAL) return;
+        s_lastUpdateTime = now;
+
+        // Calculate headroom: how much FPS budget do we have above the floor?
+        // Higher baseline = more headroom = higher thresholds before throttling
+        float headroom = s_baselineFps - TARGET_FPS_FLOOR;
+        if (headroom <= 0)
+        {
+            // Very weak hardware — use minimum thresholds
+            EmergencyZombieThreshold = MIN_EMERGENCY;
+            CriticalZombieThreshold = MIN_CRITICAL;
+            return;
+        }
+
+        // Scale thresholds based on baseline FPS headroom
+        // At 60 FPS baseline: headroom=30, ratio=1.0 (default thresholds)
+        // At 100 FPS baseline: headroom=70, ratio=2.33 (higher thresholds)
+        // At 40 FPS baseline: headroom=10, ratio=0.33 (lower thresholds)
+        float ratio = headroom / 30f;
+
+        int emergencyTarget = Mathf.RoundToInt(40f * ratio);
+        int criticalTarget = Mathf.RoundToInt(80f * ratio);
+
+        // If we're currently dropping frames, lower thresholds to be more aggressive
+        if (currentFps < TARGET_FPS_COMFORTABLE && currentZombieCount > 20)
+        {
+            float stressFactor = Mathf.Clamp01(currentFps / TARGET_FPS_COMFORTABLE);
+            emergencyTarget = Mathf.RoundToInt(emergencyTarget * stressFactor);
+            criticalTarget = Mathf.RoundToInt(criticalTarget * stressFactor);
+        }
+
+        EmergencyZombieThreshold = Mathf.Clamp(emergencyTarget, MIN_EMERGENCY, MAX_EMERGENCY);
+        CriticalZombieThreshold = Mathf.Clamp(criticalTarget, MIN_CRITICAL, MAX_CRITICAL);
+    }
+}

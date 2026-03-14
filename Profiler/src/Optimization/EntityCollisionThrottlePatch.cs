@@ -1,0 +1,116 @@
+// EntityCollisionThrottlePatch.cs
+//
+// Throttles expensive CharacterController.Move() calls for distant/many zombies
+// This is the single most expensive operation in MoveEntityHeaded
+// CharacterController.Move() does full physics collision detection every call
+// FIX: Combat bypass + removed ApplySimpleMotion (caused entities to fall through world)
+
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+/// <summary>
+/// Throttle Entity.entityCollision for non-players when zombie count is high
+/// entityCollision calls CharacterController.Move which is extremely expensive
+/// For distant zombies during hordes, we can skip physics some frames
+/// </summary>
+[HarmonyPatch(typeof(Entity), "entityCollision")]
+public static class EntityCollisionThrottlePatch
+{
+    // Track last collision frame per entity
+    private static readonly Dictionary<int, int> s_lastCollisionFrame = new(256);
+
+    // Thresholds
+    private const float CLOSE_DIST_SQ = 400f;   // 20m - always run collision
+    private const float MID_DIST_SQ = 900f;     // 30m
+    private const float FAR_DIST_SQ = 2500f;    // 50m
+
+    public static bool Prefix(Entity __instance, Vector3 _motion)
+    {
+        // Only throttle EntityAlive (not items, particles, etc)
+        if (__instance is not EntityAlive alive) return true;
+        
+        // Never throttle players
+        if (alive is EntityPlayer) return true;
+        
+        // Feature check - use same toggle as MoveLOD
+        if (!ProfilerConfig.Current.EnableMoveLOD) return true;
+
+        try
+        {
+            // ALWAYS run full collision for combat-engaged entities
+            // Skipping physics for active combatants causes them to clip through walls/ground
+            if (IsCombatOrStateActive(alive)) return true;
+
+            int currentFrame = Time.frameCount;
+            FrameCache.EnsureUpdated();
+
+            // Only throttle in emergency mode — adaptive thresholds
+            if (FrameCache.ZombieCount < AdaptiveThresholds.EmergencyZombieThreshold)
+                return true;
+
+            int entityId = __instance.entityId;
+            float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
+            
+            // Close entities - always run full collision
+            if (distSq < CLOSE_DIST_SQ)
+                return true;
+            
+            // Calculate skip interval based on distance and zombie count
+            int skipInterval;
+            bool criticalMode = FrameCache.ZombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
+            
+            if (distSq < MID_DIST_SQ)
+            {
+                skipInterval = criticalMode ? 2 : 1;
+            }
+            else if (distSq < FAR_DIST_SQ)
+            {
+                skipInterval = criticalMode ? 3 : 2;
+            }
+            else
+            {
+                skipInterval = criticalMode ? 4 : 3;
+            }
+            
+            if (skipInterval <= 1) return true;
+            
+            // Frame slicing
+            int frameSlot = currentFrame % skipInterval;
+            int entitySlot = (entityId & 0x7FFFFFFF) % skipInterval;
+            
+            if (frameSlot == entitySlot)
+            {
+                s_lastCollisionFrame[entityId] = currentFrame;
+                return true;
+            }
+            
+            // Skip collision entirely - entity holds position for this frame
+            // Safer than ApplySimpleMotion which caused entities to fall through world
+            // Distant non-combat entities catch up naturally on the next processed frame
+            ProfilingUtils.PerFrameCounters.Increment("EntityCollision.Skipped");
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsCombatOrStateActive(EntityAlive entity)
+    {
+        if (entity.GetAttackTarget() != null) return true;
+        if (entity.GetRevengeTarget() != null) return true;
+        if (entity.hasBeenAttackedTime > 0) return true;
+        if (entity.isAlert) return true;
+        if (entity.HasInvestigatePosition) return true;
+        return false;
+    }
+
+    public static void OnEntityRemoved(int entityId)
+    {
+        s_lastCollisionFrame.Remove(entityId);
+    }
+}

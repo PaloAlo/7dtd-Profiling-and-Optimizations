@@ -1,0 +1,143 @@
+﻿// PlayerUpdateThrottlePatch.cs
+//
+// Throttles expensive sub-operations inside EntityPlayerLocal that scale
+// with zombie count. Profiling shows EntityPlayerLocal.Update is 3-10%
+// of total frame time — disproportionate for a single entity.
+//
+// Root cause: Several player sub-systems iterate the entity list every
+// frame (nearby entity checks, aim assist, targeting). This patch throttles
+// those iterations when entity count is high.
+//
+// We target specific sub-methods rather than the whole Update to preserve
+// responsive player controls (camera, input, movement must always be 
+// frame-accurate).
+
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+/// <summary>
+/// Throttle EntityPlayerLocal.updateTargeting — iterates nearby entities to
+/// find crosshair target. During large hordes this is expensive. Reducing
+/// to every 2nd-3rd frame when zombie count is high is imperceptible to the player.
+/// </summary>
+[HarmonyPatch(typeof(EntityPlayerLocal), "updateTargeting")]
+public static class PlayerTargetingThrottlePatch
+{
+    private static int s_lastRunFrame = -1;
+    private static int s_cachedZombieCount;
+    private static int s_cachedFrame = -1;
+
+    private const int EMERGENCY_THRESHOLD = 40;
+    private const int CRITICAL_THRESHOLD = 80;
+
+    public static bool Prefix()
+    {
+        if (!ProfilerConfig.Current.EnableMoveLOD) return true;
+
+        try
+        {
+            int frame = Time.frameCount;
+            UpdateCaches(frame);
+
+            if (s_cachedZombieCount < EMERGENCY_THRESHOLD) return true;
+
+            int interval = s_cachedZombieCount >= CRITICAL_THRESHOLD ? 3 : 2;
+
+            if (frame - s_lastRunFrame >= interval)
+            {
+                s_lastRunFrame = frame;
+                return true;
+            }
+
+            ProfilingUtils.PerFrameCounters.Increment("PlayerTargeting.Throttled");
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void UpdateCaches(int frame)
+    {
+        if (s_cachedFrame == frame) return;
+        s_cachedFrame = frame;
+
+        var world = GameManager.Instance?.World;
+        if (world == null) return;
+
+        s_cachedZombieCount = 0;
+        var entities = world.Entities.list;
+        for (int i = 0; i < entities.Count; i++)
+        {
+            var entity = entities[i];
+            if (entity != null && entity is EntityZombie)
+                s_cachedZombieCount++;
+        }
+    }
+}
+
+/// <summary>
+/// Throttle EntityPlayerLocal aim assist — does entity proximity checks
+/// that scale with entity count. Safe to reduce frequency during hordes.
+/// </summary>
+[HarmonyPatch(typeof(EntityPlayerLocal), "updateAimAssist")]
+public static class PlayerAimAssistThrottlePatch
+{
+    private static int s_lastRunFrame = -1;
+    private static int s_cachedZombieCount;
+    private static int s_cachedFrame = -1;
+
+    private const int EMERGENCY_THRESHOLD = 40;
+    private const int CRITICAL_THRESHOLD = 80;
+
+    public static bool Prefix()
+    {
+        if (!ProfilerConfig.Current.EnableMoveLOD) return true;
+
+        try
+        {
+            int frame = Time.frameCount;
+            UpdateCaches(frame);
+
+            if (s_cachedZombieCount < EMERGENCY_THRESHOLD) return true;
+
+            int interval = s_cachedZombieCount >= CRITICAL_THRESHOLD ? 4 : 2;
+
+            if (frame - s_lastRunFrame >= interval)
+            {
+                s_lastRunFrame = frame;
+                return true;
+            }
+
+            ProfilingUtils.PerFrameCounters.Increment("PlayerAimAssist.Throttled");
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void UpdateCaches(int frame)
+    {
+        if (s_cachedFrame == frame) return;
+        s_cachedFrame = frame;
+
+        var world = GameManager.Instance?.World;
+        if (world == null) return;
+
+        s_cachedZombieCount = 0;
+        var entities = world.Entities.list;
+        for (int i = 0; i < entities.Count; i++)
+        {
+            var entity = entities[i];
+            if (entity != null && entity is EntityZombie)
+                s_cachedZombieCount++;
+        }
+    }
+}

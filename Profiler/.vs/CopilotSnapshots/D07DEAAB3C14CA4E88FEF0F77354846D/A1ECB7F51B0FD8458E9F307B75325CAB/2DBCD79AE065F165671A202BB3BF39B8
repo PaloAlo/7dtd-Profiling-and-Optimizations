@@ -1,0 +1,129 @@
+﻿// UpdateTasksLODPatch.cs
+// LOD-based throttling for EntityAlive.updateTasks.
+// CONSERVATIVE: Only throttles FAR entities with NO combat involvement.
+// Runs minimal maintenance to preserve entity lifecycle.
+
+using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntityAlive), "updateTasks")]
+public static class UpdateTasksLODPatch
+{
+    // Track last full AI update per entity
+    private static readonly Dictionary<int, int> s_lastAIUpdateFrame = new Dictionary<int, int>(256);
+
+    // VERY CONSERVATIVE thresholds
+    // Only throttle entities > 50m away with no combat involvement
+    private const float MIN_THROTTLE_DIST_SQ = 2500f;  // 50m - never throttle closer
+    private const float FAR_DIST_SQ = 6400f;           // 80m
+
+    public static bool Prefix(EntityAlive __instance)
+    {
+        // Feature toggle
+        if (!ProfilerConfig.Current.EnableStaggeredUpdate) return true;
+        
+        // Safety checks
+        if (__instance == null) return true;
+
+        // NEVER throttle players
+        if (__instance is EntityPlayer) return true;
+
+        // NEVER throttle entities in ANY combat or alert state
+        if (__instance.GetAttackTarget() != null) return true;
+        if (__instance.GetRevengeTarget() != null) return true;
+        if (__instance.hasBeenAttackedTime > 0) return true;
+        if (__instance.isAlert) return true;
+        
+        // NEVER throttle sleeping entities (need to wake up properly)
+        if (__instance.IsSleeping) return true;
+        
+        // NEVER throttle entities with investigate position
+        if (__instance.HasInvestigatePosition) return true;
+
+        try
+        {
+            int entityId = __instance.entityId;
+            int currentFrame = Time.frameCount;
+
+            // Calculate distance to player
+            float distSq = GetDistSqToNearestPlayer(__instance);
+
+            // Close entities - ALWAYS full update
+            if (distSq < MIN_THROTTLE_DIST_SQ)
+            {
+                return true;
+            }
+
+            // Determine skip interval based on distance
+            int interval = distSq < FAR_DIST_SQ ? 2 : 4;
+
+            // Check if enough frames have passed
+            if (!s_lastAIUpdateFrame.TryGetValue(entityId, out int lastFrame))
+            {
+                // First time - run update
+                s_lastAIUpdateFrame[entityId] = currentFrame;
+                return true;
+            }
+
+            int framesSince = currentFrame - lastFrame;
+            if (framesSince >= interval)
+            {
+                // Time for full update
+                s_lastAIUpdateFrame[entityId] = currentFrame;
+                return true;
+            }
+
+            // Skip full AI update but run critical maintenance
+            RunMinimalMaintenance(__instance);
+
+            ProfilingUtils.PerFrameCounters.Increment("updateTasks.LODSkipped");
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static float GetDistSqToNearestPlayer(EntityAlive entity)
+    {
+        var world = GameManager.Instance?.World;
+        if (world == null) return 0f;
+
+        var player = world.GetPrimaryPlayer();
+        if (player == null) return float.MaxValue;
+
+        return (entity.position - player.position).sqrMagnitude;
+    }
+
+    private static void RunMinimalMaintenance(EntityAlive entity)
+    {
+        // Run only critical low-cost operations when skipping full AI update
+        try
+        {
+            // 1. Check despawn (required for entity lifecycle)
+            entity.CheckDespawn();
+
+            // 2. Clear expired see cache (cheap operation)
+            entity.seeCache?.ClearIfExpired();
+        }
+        catch
+        {
+            // Swallow - maintenance is best-effort
+        }
+    }
+
+    public static void OnEntityRemoved(int entityId)
+    {
+        s_lastAIUpdateFrame.Remove(entityId);
+    }
+
+    public static void ClearCaches()
+    {
+        s_lastAIUpdateFrame.Clear();
+    }
+}

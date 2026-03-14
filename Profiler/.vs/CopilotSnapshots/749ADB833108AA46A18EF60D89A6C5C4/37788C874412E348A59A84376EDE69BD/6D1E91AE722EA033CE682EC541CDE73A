@@ -1,0 +1,114 @@
+﻿// ConsoleCmdProfilerConfigReload.cs
+
+using System;
+using System.Collections.Generic;
+using HarmonyLib;
+using UnityEngine;
+
+// Console command to reload profiler config at runtime and apply side-effects
+// Usage in-game (SdtdConsole): profiler.reload
+// Also accepts optional "apply" to force apply even if no change.
+public class ConsoleCmdProfilerConfigReload : ConsoleCmdAbstract
+{
+    public override string[] getCommands() => new[] { "profiler-reload", "pr-reload" };
+
+    public override string getDescription() => "Reload profiler_config.json and apply runtime changes.";
+
+    public override string getHelp() => "Usage: profiler-reload\r\nReloads the profiler JSON config and applies live changes.\r\nNo restart required for most settings. Some changes (deep structural ones) may still require a restart.";
+    public override void Execute(List<string> _params, CommandSenderInfo _senderInfo)
+    {
+        try
+        {
+            SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: Reloading config...");
+            ProfilerConfig.Load();
+
+            var cfg = ProfilerConfig.Current;
+            if (cfg == null)
+            {
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: Failed to load config (null).");
+                return;
+            }
+
+            // Spatial grid
+            try
+            {
+                if (cfg.EnableSpatialGrid)
+                {
+                    SpatialGridManager.Init();
+                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: SpatialGrid enabled (initialized).");
+                }
+                else
+                {
+                    SpatialGridManager.Shutdown();
+                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: SpatialGrid disabled (shut down).");
+                }
+            }
+            catch (Exception e)
+            {
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Profiler: SpatialGrid apply failed: {e.Message}");
+            }
+
+            // Path cache
+            try
+            {
+                PathCache.Init();
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Profiler: PathCache (TTL={cfg.PathCacheTTLSeconds:F2}s) ready.");
+            }
+            catch (Exception e)
+            {
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Profiler: PathCache apply failed: {e.Message}");
+            }
+
+            // LOD toggles are read on each check; just report current state
+            SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Profiler: EnableMoveLOD={cfg.EnableMoveLOD}, EnableTargetCache={cfg.EnableTargetCache}");
+
+            // World tick slicing - apply immediately if world exists
+            try
+            {
+                var world = GameManager.Instance?.World;
+                if (world != null)
+                {
+                    world.tickEntityFrameCountAverage = cfg.EntityTickFrameCountAverage;
+                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Profiler: Applied World.tickEntityFrameCountAverage = {cfg.EntityTickFrameCountAverage}");
+                }
+                else
+                {
+                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: World not available; tick slice will apply on world init.");
+                }
+            }
+            catch (Exception e)
+            {
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Profiler: Failed to apply tick slice: {e.Message}");
+            }
+
+            // Instrumentation toggle
+            try
+            {
+                if (cfg.EnableDeepPhysicsInstrumentation)
+                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: Deep physics instrumentation ENABLED.");
+                else
+                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: Deep physics instrumentation DISABLED.");
+            }
+            catch { /* ignore */ }
+
+            // Clear or reset runtime caches
+            try
+            {
+                try { FindPathCachePatch.CleanupStale(); } catch { }
+                try { PathCache.ClearStale(cfg.PathCacheTTLSeconds * 2.0); } catch { }
+
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: Runtime caches cleaned (best-effort).");
+            }
+            catch (Exception e)
+            {
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Profiler: Runtime cache cleanup failed: {e.Message}");
+            }
+
+            SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: Reload complete.");
+        }
+        catch (Exception ex)
+        {
+            SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Profiler: Reload failed: {ex.GetType().Name}: {ex.Message}");
+        }
+    }
+}
