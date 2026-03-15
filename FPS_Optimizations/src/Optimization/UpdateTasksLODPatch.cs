@@ -29,7 +29,7 @@ public static class UpdateTasksLODPatch
 
         try
         {
-            if (IsCombatOrStateActive(__instance)) return true;
+            if (__instance.IsSleeping) return true;
 
             int entityId = __instance.entityId;
             int currentFrame = Time.frameCount;
@@ -41,6 +41,12 @@ public static class UpdateTasksLODPatch
             float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
 
             if (distSq < CLOSE_DIST_SQ) return true;
+
+            bool inCombat = __instance.GetAttackTarget() != null
+                         || __instance.GetRevengeTarget() != null
+                         || __instance.hasBeenAttackedTime > 0
+                         || __instance.isAlert
+                         || __instance.HasInvestigatePosition;
 
             int interval;
             if (distSq < MID_DIST_SQ)
@@ -59,6 +65,10 @@ public static class UpdateTasksLODPatch
             {
                 interval = criticalMode ? 6 : (emergencyMode ? 4 : 3);
             }
+
+            // Combat-engaged entities get gentler throttling (halved interval)
+            if (inCombat && interval > 2)
+                interval = System.Math.Max(2, (interval + 1) / 2);
 
             if (interval <= 1) return true;
 
@@ -81,18 +91,6 @@ public static class UpdateTasksLODPatch
         {
             return true;
         }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsCombatOrStateActive(EntityAlive entity)
-    {
-        if (entity.GetAttackTarget() != null) return true;
-        if (entity.GetRevengeTarget() != null) return true;
-        if (entity.hasBeenAttackedTime > 0) return true;
-        if (entity.isAlert) return true;
-        if (entity.IsSleeping) return true;
-        if (entity.HasInvestigatePosition) return true;
-        return false;
     }
 
     private static void RunMinimalMaintenance(EntityAlive entity)

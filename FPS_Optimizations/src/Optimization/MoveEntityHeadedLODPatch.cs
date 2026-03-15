@@ -1,7 +1,8 @@
 // MoveEntityHeadedLODPatch.cs
 //
 // Distance-based throttling for EntityAlive.MoveEntityHeaded — the single
-// most expensive per-entity method.  Combat-engaged entities always run.
+// most expensive per-entity method.  Close-range combat entities (<30m)
+// always run; distant combat entities get reduced (halved) throttle intervals.
 
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -24,7 +25,7 @@ public static class MoveEntityHeadedLODPatch
 
         try
         {
-            if (IsCombatOrStateActive(__instance)) return true;
+            if (__instance.IsSleeping) return true;
 
             float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
 
@@ -37,6 +38,12 @@ public static class MoveEntityHeadedLODPatch
             int zombieCount = FrameCache.ZombieCount;
             bool emergencyMode = zombieCount >= AdaptiveThresholds.EmergencyZombieThreshold;
             bool criticalMode = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
+
+            bool inCombat = __instance.GetAttackTarget() != null
+                         || __instance.GetRevengeTarget() != null
+                         || __instance.hasBeenAttackedTime > 0
+                         || __instance.isAlert
+                         || __instance.HasInvestigatePosition;
 
             int skipInterval;
             if (distSq < tier2Sq)
@@ -51,6 +58,10 @@ public static class MoveEntityHeadedLODPatch
             {
                 skipInterval = criticalMode ? 6 : (emergencyMode ? 4 : 3);
             }
+
+            // Combat-engaged entities get gentler throttling (halved interval)
+            if (inCombat && skipInterval > 2)
+                skipInterval = System.Math.Max(2, (skipInterval + 1) / 2);
 
             if (skipInterval <= 1) return true;
 
@@ -70,18 +81,6 @@ public static class MoveEntityHeadedLODPatch
         {
             return true;
         }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsCombatOrStateActive(EntityAlive entity)
-    {
-        if (entity.GetAttackTarget() != null) return true;
-        if (entity.GetRevengeTarget() != null) return true;
-        if (entity.hasBeenAttackedTime > 0) return true;
-        if (entity.isAlert) return true;
-        if (entity.IsSleeping) return true;
-        if (entity.HasInvestigatePosition) return true;
-        return false;
     }
 
     public static void OnEntityRemoved(int entityId) => s_lastUpdateFrame.Remove(entityId);

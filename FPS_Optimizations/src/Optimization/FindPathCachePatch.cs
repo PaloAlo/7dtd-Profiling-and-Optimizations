@@ -41,8 +41,6 @@ static class FindPathCachePatch
 
         try
         {
-            if (IsCombatOrStateActive(__instance)) return true;
-
             UpdatePlayerPos();
             float distSq = (__instance.position - s_cachedPlayerPos).sqrMagnitude;
             if (distSq < CLOSE_DIST_SQ) return true;
@@ -77,17 +75,6 @@ static class FindPathCachePatch
         catch { }
 
         return true;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsCombatOrStateActive(EntityAlive entity)
-    {
-        if (entity.GetAttackTarget() != null) return true;
-        if (entity.GetRevengeTarget() != null) return true;
-        if (entity.hasBeenAttackedTime > 0) return true;
-        if (entity.isAlert) return true;
-        if (entity.HasInvestigatePosition) return true;
-        return false;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

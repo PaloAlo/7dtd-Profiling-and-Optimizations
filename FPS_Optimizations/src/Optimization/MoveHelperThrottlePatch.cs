@@ -35,10 +35,19 @@ public static class MoveHelperThrottlePatch
         FrameCache.EnsureUpdated();
         if (FrameCache.ShouldBypassThrottling) return true;
 
-        if (IsCombatOrStateActive(___entity)) return true;
+        if (___entity.IsSleeping) return true;
 
         try
         {
+            // Close-range combat entities always get full updates
+            float distSq = (___entity.position - FrameCache.PlayerPosition).sqrMagnitude;
+            bool inCombat = ___entity.GetAttackTarget() != null
+                         || ___entity.GetRevengeTarget() != null
+                         || ___entity.hasBeenAttackedTime > 0
+                         || ___entity.isAlert
+                         || ___entity.HasInvestigatePosition;
+
+            if (inCombat && distSq < 400f) return true;  // 20m
             int entityId = ___entity.entityId;
             int currentFrame = Time.frameCount;
             int zombieCount = FrameCache.ZombieCount;
@@ -100,17 +109,6 @@ public static class MoveHelperThrottlePatch
         {
             return true;
         }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsCombatOrStateActive(EntityAlive entity)
-    {
-        if (entity.GetAttackTarget() != null) return true;
-        if (entity.GetRevengeTarget() != null) return true;
-        if (entity.hasBeenAttackedTime > 0) return true;
-        if (entity.isAlert) return true;
-        if (entity.HasInvestigatePosition) return true;
-        return false;
     }
 
     public static void OnEntityRemoved(int entityId) => s_moveData.Remove(entityId);

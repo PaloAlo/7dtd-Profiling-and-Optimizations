@@ -26,7 +26,7 @@ public static class SpeedStrafeThrottlePatch
         FrameCache.EnsureUpdated();
         if (FrameCache.ShouldBypassThrottling) return true;
 
-        if (IsCombatOrStateActive(__instance)) return true;
+        if (__instance.IsSleeping) return true;
 
         try
         {
@@ -35,6 +35,12 @@ public static class SpeedStrafeThrottlePatch
 
             float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
             if (distSq < ALWAYS_RUN_DIST_SQ) return true;
+
+            bool inCombat = __instance.GetAttackTarget() != null
+                         || __instance.GetRevengeTarget() != null
+                         || __instance.hasBeenAttackedTime > 0
+                         || __instance.isAlert
+                         || __instance.HasInvestigatePosition;
 
             bool criticalMode = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
 
@@ -45,6 +51,10 @@ public static class SpeedStrafeThrottlePatch
                 skipInterval = criticalMode ? 3 : 2;
             else
                 skipInterval = criticalMode ? 4 : 3;
+
+            // Combat-engaged entities get gentler throttling (halved interval)
+            if (inCombat && skipInterval > 2)
+                skipInterval = System.Math.Max(2, (skipInterval + 1) / 2);
 
             if (skipInterval <= 1) return true;
 
@@ -68,15 +78,4 @@ public static class SpeedStrafeThrottlePatch
 
     public static void OnEntityRemoved(int entityId) => s_lastFrame.Remove(entityId);
     public static void ClearCaches() => s_lastFrame.Clear();
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsCombatOrStateActive(EntityAlive entity)
-    {
-        if (entity.GetAttackTarget() != null) return true;
-        if (entity.GetRevengeTarget() != null) return true;
-        if (entity.hasBeenAttackedTime > 0) return true;
-        if (entity.isAlert) return true;
-        if (entity.HasInvestigatePosition) return true;
-        return false;
-    }
 }

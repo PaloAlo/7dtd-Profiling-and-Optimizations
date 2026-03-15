@@ -37,7 +37,7 @@ public static class ZombieFrameSkipPatch
             if (zombieCount < AdaptiveThresholds.EmergencyZombieThreshold)
                 return true;
 
-            if (IsCombatOrStateActive(__instance)) return true;
+            if (__instance.IsSleeping) return true;
 
             float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
             if (distSq < ALWAYS_UPDATE_DIST_SQ) return true;
@@ -65,17 +65,6 @@ public static class ZombieFrameSkipPatch
         {
             return true;
         }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsCombatOrStateActive(EntityAlive entity)
-    {
-        if (entity.GetAttackTarget() != null) return true;
-        if (entity.GetRevengeTarget() != null) return true;
-        if (entity.hasBeenAttackedTime > 0) return true;
-        if (entity.isAlert) return true;
-        if (entity.HasInvestigatePosition) return true;
-        return false;
     }
 
     public static void OnEntityRemoved(int entityId) => s_lastUpdateFrame.Remove(entityId);
