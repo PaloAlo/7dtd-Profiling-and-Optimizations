@@ -42,6 +42,9 @@ public static class SpeedStrafeThrottlePatch
                          || __instance.isAlert
                          || __instance.HasInvestigatePosition;
 
+            // Combat-engaged entities always get fresh heading calculation
+            if (inCombat) return true;
+
             bool criticalMode = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
 
             int skipInterval;
@@ -51,10 +54,6 @@ public static class SpeedStrafeThrottlePatch
                 skipInterval = criticalMode ? 3 : 2;
             else
                 skipInterval = criticalMode ? 4 : 3;
-
-            // Combat-engaged entities get gentler throttling (halved interval)
-            if (inCombat && skipInterval > 2)
-                skipInterval = System.Math.Max(2, (skipInterval + 1) / 2);
 
             if (skipInterval <= 1) return true;
 
@@ -68,6 +67,7 @@ public static class SpeedStrafeThrottlePatch
                 return true;
             }
 
+            ProfilerCounterBridge.Increment("SpeedStrafe.Throttled");
             return false;
         }
         catch

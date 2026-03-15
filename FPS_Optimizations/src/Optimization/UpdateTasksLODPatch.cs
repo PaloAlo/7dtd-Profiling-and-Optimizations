@@ -85,6 +85,7 @@ public static class UpdateTasksLODPatch
             }
 
             RunMinimalMaintenance(__instance);
+            ProfilerCounterBridge.Increment("updateTasks.LODSkipped");
             return false;
         }
         catch

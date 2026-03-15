@@ -59,6 +59,7 @@ static class FindPathCachePatch
                         && entityMovedSq < DUPLICATE_DIST_SQ
                         && Mathf.Approximately(moveSpeed, lastReq.Speed))
                     {
+                        ProfilerCounterBridge.Increment("FindPath.CacheHit");
                         return false;
                     }
                 }

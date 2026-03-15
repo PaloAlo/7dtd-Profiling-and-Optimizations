@@ -44,6 +44,7 @@ public static class SharedPlayerVisibilityPatch
             if (s_visibilityCache.TryGetValue(key, out bool cached))
             {
                 __result = cached;
+                ProfilerCounterBridge.Increment("SeeCache.SharedHit");
                 return false;
             }
 

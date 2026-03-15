@@ -32,6 +32,7 @@ public static class PlayerBlockRadiusThrottlePatch
                 return true;
             }
 
+            ProfilerCounterBridge.Increment("PlayerBlockRadius.Throttled");
             return false;
         }
         catch
@@ -66,6 +67,7 @@ public static class PlayerShelterThrottlePatch
                 return true;
             }
 
+            ProfilerCounterBridge.Increment("PlayerShelter.Throttled");
             return false;
         }
         catch

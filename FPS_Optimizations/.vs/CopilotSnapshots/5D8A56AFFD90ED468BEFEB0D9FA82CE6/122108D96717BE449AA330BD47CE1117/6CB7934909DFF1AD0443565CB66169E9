@@ -1,0 +1,78 @@
+﻿// PlayerUpdateThrottlePatch.cs
+//
+// Throttles two expensive EntityPlayerLocal sub-operations during high zombie
+// counts: BlockRadiusEffectsTick (iterates tile entities across 3 chunks) and
+// ShelterFrameUpdate (multiple physics raycasts per frame).
+
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntityPlayerLocal), nameof(EntityPlayerLocal.BlockRadiusEffectsTick))]
+public static class PlayerBlockRadiusThrottlePatch
+{
+    private static int s_lastRunFrame = -1;
+
+    public static bool Prefix()
+    {
+        if (!OptimizationConfig.Current.EnableMoveLOD) return true;
+
+        try
+        {
+            int frame = Time.frameCount;
+            FrameCache.EnsureUpdated();
+
+            if (FrameCache.ShouldBypassThrottling) return true;
+            if (FrameCache.ZombieCount < AdaptiveThresholds.EmergencyZombieThreshold) return true;
+
+            int interval = FrameCache.ZombieCount >= AdaptiveThresholds.CriticalZombieThreshold ? 3 : 2;
+
+            if (frame - s_lastRunFrame >= interval)
+            {
+                s_lastRunFrame = frame;
+                return true;
+            }
+
+            ProfilerCounterBridge.Increment("PlayerBlockRadius.Throttled");
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+}
+
+[HarmonyPatch(typeof(EntityPlayerLocal), nameof(EntityPlayerLocal.ShelterFrameUpdate))]
+public static class PlayerShelterThrottlePatch
+{
+    private static int s_lastRunFrame = -1;
+
+    public static bool Prefix()
+    {
+        if (!OptimizationConfig.Current.EnableMoveLOD) return true;
+
+        try
+        {
+            int frame = Time.frameCount;
+            FrameCache.EnsureUpdated();
+
+            if (FrameCache.ShouldBypassThrottling) return true;
+            if (FrameCache.ZombieCount < AdaptiveThresholds.EmergencyZombieThreshold) return true;
+
+            int interval = FrameCache.ZombieCount >= AdaptiveThresholds.CriticalZombieThreshold ? 4 : 2;
+
+            if (frame - s_lastRunFrame >= interval)
+            {
+                s_lastRunFrame = frame;
+                return true;
+            }
+
+            ProfilerCounterBridge.Increment("PlayerShelter.Throttled");
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+}

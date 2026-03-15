@@ -59,6 +59,7 @@ public static class ZombieFrameSkipPatch
                 return true;
             }
 
+            ProfilerCounterBridge.Increment("ZombieFrame.Skipped");
             return false;
         }
         catch

@@ -39,15 +39,14 @@ public static class MoveHelperThrottlePatch
 
         try
         {
-            // Close-range combat entities always get full updates
-            float distSq = (___entity.position - FrameCache.PlayerPosition).sqrMagnitude;
             bool inCombat = ___entity.GetAttackTarget() != null
                          || ___entity.GetRevengeTarget() != null
                          || ___entity.hasBeenAttackedTime > 0
                          || ___entity.isAlert
                          || ___entity.HasInvestigatePosition;
 
-            if (inCombat && distSq < 400f) return true;  // 20m
+            // Combat-engaged entities always get full obstacle avoidance
+            if (inCombat) return true;
             int entityId = ___entity.entityId;
             int currentFrame = Time.frameCount;
             int zombieCount = FrameCache.ZombieCount;
@@ -103,6 +102,7 @@ public static class MoveHelperThrottlePatch
                 return true;
             }
 
+            ProfilerCounterBridge.Increment("MoveHelper.Throttled");
             return false;
         }
         catch

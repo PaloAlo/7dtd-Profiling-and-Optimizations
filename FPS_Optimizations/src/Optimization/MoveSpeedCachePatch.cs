@@ -36,6 +36,7 @@ public static class MoveSpeedCachePatch
                 if (currentTick - cached.TickCached < CACHE_TTL_TICKS)
                 {
                     __result = cached.Value;
+                    ProfilerCounterBridge.Increment("MoveSpeed.CacheHit");
                     return false;
                 }
             }

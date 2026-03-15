@@ -1,0 +1,72 @@
+﻿// ZombieFrameSkipPatch.cs
+//
+// Skips EntityAlive.Update() for very distant non-combat zombies during high
+// zombie counts.  Update() itself is cheap (~0.018 ms) but at 80+ zombies the
+// aggregate adds up.  Only applies beyond 80 m where the skip is invisible.
+//
+// SAFETY:
+//   - Never modifies entity state (motion, speed, etc.).
+//   - Transparent during AI-off and the grace period after AI resumes.
+//   - Combat-engaged entities always run.
+
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntityAlive), nameof(EntityAlive.Update))]
+public static class ZombieFrameSkipPatch
+{
+    private static readonly Dictionary<int, int> s_lastUpdateFrame = new Dictionary<int, int>(256);
+
+    private const float ALWAYS_UPDATE_DIST_SQ = 6400f;   // 80 m
+    private const float FAR_DIST_SQ = 14400f;            // 120 m
+
+    public static bool Prefix(EntityAlive __instance)
+    {
+        if (__instance == null) return true;
+        if (__instance is EntityPlayer) return true;
+        if (!OptimizationConfig.Current.EnableMoveLOD) return true;
+
+        FrameCache.EnsureUpdated();
+        if (FrameCache.ShouldBypassThrottling) return true;
+
+        try
+        {
+            int zombieCount = FrameCache.ZombieCount;
+            if (zombieCount < AdaptiveThresholds.EmergencyZombieThreshold)
+                return true;
+
+            if (__instance.IsSleeping) return true;
+
+            float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
+            if (distSq < ALWAYS_UPDATE_DIST_SQ) return true;
+
+            bool criticalMode = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
+
+            int skipInterval;
+            if (distSq < FAR_DIST_SQ)
+                skipInterval = 3;
+            else
+                skipInterval = criticalMode ? 4 : 3;
+
+            int frameSlot = Time.frameCount % skipInterval;
+            int entitySlot = (__instance.entityId & 0x7FFFFFFF) % skipInterval;
+
+            if (frameSlot == entitySlot)
+            {
+                s_lastUpdateFrame[__instance.entityId] = Time.frameCount;
+                return true;
+            }
+
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    public static void OnEntityRemoved(int entityId) => s_lastUpdateFrame.Remove(entityId);
+    public static void ClearCaches() => s_lastUpdateFrame.Clear();
+}

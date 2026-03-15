@@ -26,6 +26,7 @@ static class GetAttackTargetCachePatch
         if (s_cache.TryGetValue(id, out var cached) && cached.frame == frame)
         {
             __result = cached.target;
+            ProfilerCounterBridge.Increment("GetAttackTarget.CacheHit");
             return false;
         }
 
@@ -58,6 +59,7 @@ static class GetRevengeTargetCachePatch
         if (s_cache.TryGetValue(id, out var cached) && cached.frame == frame)
         {
             __result = cached.target;
+            ProfilerCounterBridge.Increment("GetRevengeTarget.CacheHit");
             return false;
         }
 

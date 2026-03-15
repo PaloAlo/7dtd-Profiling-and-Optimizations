@@ -43,6 +43,9 @@ public static class EntityCollisionThrottlePatch
                          || alive.isAlert
                          || alive.HasInvestigatePosition;
 
+            // Combat-engaged entities always get full collision
+            if (inCombat) return true;
+
             bool criticalMode = FrameCache.ZombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
 
             int skipInterval;
@@ -52,10 +55,6 @@ public static class EntityCollisionThrottlePatch
                 skipInterval = criticalMode ? 2 : 1;
             else
                 skipInterval = criticalMode ? 3 : 2;
-
-            // Combat-engaged entities get gentler throttling (halved interval)
-            if (inCombat && skipInterval > 2)
-                skipInterval = System.Math.Max(2, (skipInterval + 1) / 2);
 
             if (skipInterval <= 1) return true;
 
@@ -69,6 +68,7 @@ public static class EntityCollisionThrottlePatch
                 return true;
             }
 
+            ProfilerCounterBridge.Increment("EntityCollision.Skipped");
             return false;
         }
         catch

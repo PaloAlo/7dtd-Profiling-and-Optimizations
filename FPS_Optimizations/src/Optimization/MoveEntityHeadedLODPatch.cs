@@ -1,8 +1,8 @@
 // MoveEntityHeadedLODPatch.cs
 //
 // Distance-based throttling for EntityAlive.MoveEntityHeaded — the single
-// most expensive per-entity method.  Close-range combat entities (<30m)
-// always run; distant combat entities get reduced (halved) throttle intervals.
+// most expensive per-entity method.  Combat-engaged entities always run
+// at full rate (any distance).  Only idle/non-combat entities are throttled.
 
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -45,6 +45,9 @@ public static class MoveEntityHeadedLODPatch
                          || __instance.isAlert
                          || __instance.HasInvestigatePosition;
 
+            // Combat-engaged entities always run movement at full rate
+            if (inCombat) return true;
+
             int skipInterval;
             if (distSq < tier2Sq)
             {
@@ -59,10 +62,6 @@ public static class MoveEntityHeadedLODPatch
                 skipInterval = criticalMode ? 6 : (emergencyMode ? 4 : 3);
             }
 
-            // Combat-engaged entities get gentler throttling (halved interval)
-            if (inCombat && skipInterval > 2)
-                skipInterval = System.Math.Max(2, (skipInterval + 1) / 2);
-
             if (skipInterval <= 1) return true;
 
             int entityId = __instance.entityId;
@@ -75,6 +74,7 @@ public static class MoveEntityHeadedLODPatch
                 return true;
             }
 
+            ProfilerCounterBridge.Increment("MoveEntityHeaded.LODSkipped");
             return false;
         }
         catch
