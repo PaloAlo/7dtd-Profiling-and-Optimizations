@@ -1,4 +1,4 @@
-// OptimizationConfig.cs
+﻿// OptimizationConfig.cs
 
 using System;
 using System.IO;
@@ -28,9 +28,6 @@ public class OptimizationConfig
 
     // Throttle step sound updates
     public bool EnableStepSoundThrottle = true;
-
-    // Throttle updateCurrentBlockPosAndValue for distant entities
-    public bool EnableBlockPosThrottle = true;
 
     public const string ConfigFileName = "fps_optimization_config.json";
     private const int ConfigVersion = 1;

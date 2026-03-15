@@ -1,4 +1,4 @@
-// EntityCleanupPatch.cs
+﻿// EntityCleanupPatch.cs
 //
 // Cleans up all per-entity caches when entities are removed from the world.
 
@@ -20,6 +20,5 @@ static class EntityCleanupPatch
         SpeedStrafeThrottlePatch.OnEntityRemoved(_entityId);
         EAITaskEvaluationThrottlePatch.OnEntityRemoved(_entityId);
         MoveSpeedCachePatch.OnEntityRemoved(_entityId);
-        BlockPosUpdateThrottlePatch.OnEntityRemoved(_entityId);
     }
 }

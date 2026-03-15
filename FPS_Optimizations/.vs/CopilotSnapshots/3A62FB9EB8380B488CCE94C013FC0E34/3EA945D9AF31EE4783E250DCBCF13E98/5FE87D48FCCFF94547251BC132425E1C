@@ -1,4 +1,4 @@
-// EntityCleanupPatch.cs
+﻿// EntityCleanupPatch.cs
 //
 // Cleans up all per-entity caches when entities are removed from the world.
 

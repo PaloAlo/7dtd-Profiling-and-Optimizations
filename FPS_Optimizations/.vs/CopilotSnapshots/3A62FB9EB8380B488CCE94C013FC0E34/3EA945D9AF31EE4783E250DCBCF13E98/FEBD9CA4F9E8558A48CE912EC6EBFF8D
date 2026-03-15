@@ -1,4 +1,4 @@
-// FrameCache.cs
+﻿// FrameCache.cs
 //
 // Centralized per-frame cache: zombie count, player position, AI-off state,
 // and grace-period tracking.  Every optimization patch reads from here instead
@@ -95,6 +95,5 @@ public static class FrameCache
         MoveHelperThrottlePatch.ClearCaches();
         MoveSpeedCachePatch.ClearCaches();
         FindPathCachePatch.Clear();
-        BlockPosUpdateThrottlePatch.ClearCaches();
     }
 }
