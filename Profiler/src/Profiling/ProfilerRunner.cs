@@ -176,7 +176,6 @@ public class ProfilerRunner : MonoBehaviour
                 if (shouldUpdate)
                 {
                     _baselineFps = avgFps;
-                    AdaptiveThresholds.SetBaselineFps(_baselineFps);
                     if (!_baselineEstablished)
                     {
                         _baselineEstablished = true;
@@ -190,10 +189,7 @@ public class ProfilerRunner : MonoBehaviour
             }
         }
 
-        // Update adaptive emergency thresholds
-        var avgFpsForAdaptive = _fpsHistory.Count > 0 ? _fpsHistory.Average() : 60f;
-        AdaptiveThresholds.Update(avgFpsForAdaptive, zombieCount);
-    }
+        }
 
     /// <summary>
     /// Track the "never recovers to baseline" pattern.
@@ -277,8 +273,6 @@ public class ProfilerRunner : MonoBehaviour
             sb.AppendLine($"# PeakZombies: {_peakZombieCount}");
             sb.AppendLine($"# CaptureNumber: {_highLoadCaptureCount + 1}/{MaxHighLoadCaptures}");
             sb.AppendLine($"# GC_MB: {GC.GetTotalMemory(false) / 1048576.0:F1}");
-            sb.AppendLine($"# AdaptiveEmergency: {AdaptiveThresholds.EmergencyZombieThreshold}");
-            sb.AppendLine($"# AdaptiveCritical: {AdaptiveThresholds.CriticalZombieThreshold}");
             sb.AppendLine();
 
             // --- TIMING DATA ---
@@ -397,23 +391,10 @@ public class ProfilerRunner : MonoBehaviour
         var zombieCount = FindZombieCount();
         var totalMs = aiMs + sensesMs + otherMs;
 
-        // Pull useful counters that our patches actually populate
-        counters.TryGetValue("GetAttackTarget.CacheHit", out var targetCacheHits);
-        counters.TryGetValue("GetAttackTarget.CacheMiss", out var targetCacheMisses);
-        counters.TryGetValue("MoveEntityHeaded.LODSkipped", out var moveLodSkipped);
-        counters.TryGetValue("updateTasks.LODSkipped", out var taskLodSkipped);
-        counters.TryGetValue("EntityCollision.Skipped", out var collisionSkipped);
-        counters.TryGetValue("MoveHelper.Throttled", out var moveHelperThrottled);
-        counters.TryGetValue("SpeedStrafe.Throttled", out var speedStrafeThrottled);
-        counters.TryGetValue("EAIManager.EvalThrottled", out var eaiEvalThrottled);
-        counters.TryGetValue("SeeCache.SharedHit", out var seeCacheSharedHits);
-        counters.TryGetValue("ZombieFrame.Skipped", out var zombieFrameSkipped);
-        counters.TryGetValue("MoveSpeed.CacheHit", out var moveSpeedCacheHits);
-
         var gcKb = GC.GetTotalMemory(false) / 1024;
         var currentFps = _fpsHistory.Count > 0 ? _fpsHistory.Average() : 0f;
 
-        var header = "TimeUtc,Frame,ZombieCount,AI_ms,Sensing_ms,Other_ms,TotalMs,GC_kb,CurrentFPS,BaselineFPS,PeakFPS,TargetCacheHits,TargetCacheMisses,MoveLODSkipped,TaskLODSkipped,CollisionSkipped,MoveHelperThrottled,SpeedStrafeThrottled,EAIEvalThrottled,SeeCacheSharedHits,ZombieFrameSkipped,MoveSpeedCacheHits,EmergencyThreshold,CriticalThreshold,Top1_Tag,Top1_ms,Top2_Tag,Top2_ms,Top3_Tag,Top3_ms,Top4_Tag,Top4_ms,Top5_Tag,Top5_ms";
+        var header = "TimeUtc,Frame,ZombieCount,AI_ms,Sensing_ms,Other_ms,TotalMs,GC_kb,CurrentFPS,BaselineFPS,PeakFPS,Top1_Tag,Top1_ms,Top2_Tag,Top2_ms,Top3_Tag,Top3_ms,Top4_Tag,Top4_ms,Top5_Tag,Top5_ms";
 
         var top = entries.OrderByDescending(kv => kv.Value.TotalMs).Take(TopMethodsCount).ToList();
 
@@ -429,20 +410,7 @@ public class ProfilerRunner : MonoBehaviour
             gcKb.ToString(),
             currentFps.ToString("F2"),
             _baselineFps.ToString("F2"),
-            _peakFps.ToString("F2"),
-            targetCacheHits.ToString(),
-            targetCacheMisses.ToString(),
-            moveLodSkipped.ToString(),
-            taskLodSkipped.ToString(),
-            collisionSkipped.ToString(),
-            moveHelperThrottled.ToString(),
-            speedStrafeThrottled.ToString(),
-            eaiEvalThrottled.ToString(),
-            seeCacheSharedHits.ToString(),
-            zombieFrameSkipped.ToString(),
-            moveSpeedCacheHits.ToString(),
-            AdaptiveThresholds.EmergencyZombieThreshold.ToString(),
-            AdaptiveThresholds.CriticalZombieThreshold.ToString()
+            _peakFps.ToString("F2")
         };
 
         for (int i = 0; i < TopMethodsCount; i++)

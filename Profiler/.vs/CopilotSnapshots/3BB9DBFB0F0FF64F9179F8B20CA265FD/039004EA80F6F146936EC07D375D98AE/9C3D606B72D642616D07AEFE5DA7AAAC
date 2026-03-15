@@ -1,0 +1,136 @@
+﻿// ZombieFrameSkipPatch.cs
+//
+// Skips EntityAlive.Update() entirely for distant non-combat zombies.
+// This is per-FRAME territory — Update() runs every render frame, not just
+// every game tick. Skipping it for far-away zombies is visually imperceptible
+// because the visual lerp catches up on the next processed frame.
+//
+// What gets skipped when Update() is skipped:
+//   - base.Update() (Entity — updateTransform, animateYaw, audio monitoring)
+//   - updateNetworkStats
+//   - MinEventContext setup (includes FastTags.CombineTags allocation)
+//   - Progression.Update (null for zombies, but still checked)
+//   - Render fade logic
+//
+// EntityHuman does NOT override Update(), so Unity calls EntityAlive.Update()
+// directly for all humanoid zombies — this single patch covers them all.
+
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntityAlive), nameof(EntityAlive.Update))]
+public static class ZombieFrameSkipPatch
+{
+    private static readonly Dictionary<int, int> s_lastUpdateFrame = new Dictionary<int, int>(256);
+
+    // Distance thresholds (squared) — kept high so visible zombies always update
+    private const float ALWAYS_UPDATE_DIST_SQ = 6400f;  // 80m — always run Update()
+    private const float FAR_DIST_SQ = 14400f;           // 120m — more aggressive skip
+
+    private static bool s_wasAIDisabled = false;
+
+    public static bool Prefix(EntityAlive __instance)
+    {
+        if (__instance == null) return true;
+        if (__instance is EntityPlayer) return true;
+
+        bool aiDisabled = GamePrefs.GetBool(EnumGamePrefs.DebugStopEnemiesMoving);
+
+        // AI Off: zero stale movement so entityCollision doesn't keep pushing the entity.
+        // Only zero motion (physics); do NOT zero speedForward/speedStrafe — those are
+        // animation parameters that must be recalculated by updateSpeedForwardAndStrafe
+        // when AI resumes, not left at 0.
+        if (aiDisabled)
+        {
+            __instance.motion = Vector3.zero;
+            s_wasAIDisabled = true;
+            return true;
+        }
+
+        // AI was just toggled back on — give every entity a grace period
+        // so all throttle patches let the full pipeline run and recalculate
+        // targets, speed, heading, etc.
+        if (s_wasAIDisabled)
+        {
+            s_wasAIDisabled = false;
+            FrameCache.StartGracePeriod(90);
+            FrameCache.ClearAllOptimizationCaches();
+        }
+
+        if (!ProfilerConfig.Current.EnableMoveLOD) return true;
+        if (FrameCache.IsInGracePeriod) return true;
+
+        try
+        {
+            int currentFrame = Time.frameCount;
+            FrameCache.EnsureUpdated();
+            int zombieCount = FrameCache.ZombieCount;
+
+            if (zombieCount < AdaptiveThresholds.EmergencyZombieThreshold)
+                return true;
+
+            // Combat-engaged entities always get full Update()
+            if (IsCombatOrStateActive(__instance)) return true;
+
+            int entityId = __instance.entityId;
+            float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
+
+            if (distSq < ALWAYS_UPDATE_DIST_SQ)
+                return true;
+
+            bool criticalMode = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
+
+            int skipInterval;
+            if (distSq < FAR_DIST_SQ)
+            {
+                // 80-120m: light skip — every 3rd frame
+                skipInterval = 3;
+            }
+            else
+            {
+                // 120m+: heavier skip — every 3rd or 4th frame
+                skipInterval = criticalMode ? 4 : 3;
+            }
+
+            // Frame slicing — distribute which entities skip which frames
+            int frameSlot = currentFrame % skipInterval;
+            int entitySlot = (entityId & 0x7FFFFFFF) % skipInterval;
+
+            if (frameSlot == entitySlot)
+            {
+                s_lastUpdateFrame[entityId] = currentFrame;
+                return true;
+            }
+
+            ProfilingUtils.PerFrameCounters.Increment("ZombieFrame.Skipped");
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsCombatOrStateActive(EntityAlive entity)
+    {
+        if (entity.GetAttackTarget() != null) return true;
+        if (entity.GetRevengeTarget() != null) return true;
+        if (entity.hasBeenAttackedTime > 0) return true;
+        if (entity.isAlert) return true;
+        if (entity.HasInvestigatePosition) return true;
+        return false;
+    }
+
+    public static void OnEntityRemoved(int entityId)
+    {
+        s_lastUpdateFrame.Remove(entityId);
+    }
+
+    public static void ClearCaches()
+    {
+        s_lastUpdateFrame.Clear();
+    }
+}

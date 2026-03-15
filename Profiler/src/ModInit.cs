@@ -6,7 +6,7 @@ using HarmonyLib;
 public class ModInit : IModApi
 {
     public static string ModsFolderPath { get; set; }
-    
+
     public void InitMod(Mod _modInstance)
     {
         var modName = _modInstance?.Name ?? "Profiler";
@@ -14,7 +14,7 @@ public class ModInit : IModApi
 
         Mod mod = ModManager.GetMod(modName);
         ModsFolderPath = mod.Path;
-        
+
         // Load config
         ProfilerConfig.Load();
         ProfilingUtils.ModInstance = _modInstance;
@@ -24,10 +24,6 @@ public class ModInit : IModApi
         var harmony = new Harmony("com.PaLoALo.profiler.7dtd");
         harmony.PatchAll(Assembly.GetExecutingAssembly());
 
-        // Initialize systems
-        SpatialGridManager.Init();
-
-        Log.Out($"Profiler loaded. Profiling={ProfilerConfig.Current.EnableProfiling}, SpatialGrid={ProfilerConfig.Current.EnableSpatialGrid}");
-        Log.Out($"MoveLOD={ProfilerConfig.Current.EnableMoveLOD}, TargetCache={ProfilerConfig.Current.EnableTargetCache}");
+        Log.Out($"Profiler loaded. Profiling={ProfilerConfig.Current.EnableProfiling}");
     }
 }

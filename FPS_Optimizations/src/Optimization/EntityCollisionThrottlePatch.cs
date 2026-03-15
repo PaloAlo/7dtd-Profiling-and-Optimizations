@@ -1,0 +1,83 @@
+// EntityCollisionThrottlePatch.cs
+//
+// Throttles CharacterController.Move() calls for distant non-combat zombies.
+// Physics collision is the most expensive single operation inside
+// MoveEntityHeaded.  Combat-engaged entities always get full collision.
+
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(Entity), "entityCollision")]
+public static class EntityCollisionThrottlePatch
+{
+    private static readonly Dictionary<int, int> s_lastCollisionFrame = new(256);
+
+    private const float CLOSE_DIST_SQ = 400f;  // 20 m
+    private const float MID_DIST_SQ = 900f;    // 30 m
+    private const float FAR_DIST_SQ = 2500f;   // 50 m
+
+    public static bool Prefix(Entity __instance, Vector3 _motion)
+    {
+        if (__instance is not EntityAlive alive) return true;
+        if (alive is EntityPlayer) return true;
+        if (!OptimizationConfig.Current.EnableMoveLOD) return true;
+
+        FrameCache.EnsureUpdated();
+        if (FrameCache.ShouldBypassThrottling) return true;
+
+        try
+        {
+            if (IsCombatOrStateActive(alive)) return true;
+
+            if (FrameCache.ZombieCount < AdaptiveThresholds.EmergencyZombieThreshold)
+                return true;
+
+            float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
+            if (distSq < CLOSE_DIST_SQ) return true;
+
+            bool criticalMode = FrameCache.ZombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
+
+            int skipInterval;
+            if (distSq < MID_DIST_SQ)
+                skipInterval = criticalMode ? 2 : 1;
+            else if (distSq < FAR_DIST_SQ)
+                skipInterval = criticalMode ? 2 : 1;
+            else
+                skipInterval = criticalMode ? 3 : 2;
+
+            if (skipInterval <= 1) return true;
+
+            int entityId = __instance.entityId;
+            int frameSlot = Time.frameCount % skipInterval;
+            int entitySlot = (entityId & 0x7FFFFFFF) % skipInterval;
+
+            if (frameSlot == entitySlot)
+            {
+                s_lastCollisionFrame[entityId] = Time.frameCount;
+                return true;
+            }
+
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsCombatOrStateActive(EntityAlive entity)
+    {
+        if (entity.GetAttackTarget() != null) return true;
+        if (entity.GetRevengeTarget() != null) return true;
+        if (entity.hasBeenAttackedTime > 0) return true;
+        if (entity.isAlert) return true;
+        if (entity.HasInvestigatePosition) return true;
+        return false;
+    }
+
+    public static void OnEntityRemoved(int entityId) => s_lastCollisionFrame.Remove(entityId);
+    public static void ClearCaches() => s_lastCollisionFrame.Clear();
+}

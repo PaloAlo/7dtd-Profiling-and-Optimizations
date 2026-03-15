@@ -12,17 +12,5 @@
 	<ItemGroup>
 	  <Compile Remove="src\Patches\OverridePatcher.cs" />
 	</ItemGroup>
-	
-	<ItemGroup>
-	  <Docs Include="docs\OptimizationPatches.md" />
-	</ItemGroup>
-
-	<Target Name="CopyDocs" AfterTargets="Build">
-	  <Copy SourceFiles="@(Docs)" DestinationFolder="$(OutputPath)\docs" SkipUnchangedFiles="true" />
-	</Target>
-
-	<ItemGroup>
-	  <None Include=".github\copilot-instructions.md" />
-	</ItemGroup>
 
  </Project>

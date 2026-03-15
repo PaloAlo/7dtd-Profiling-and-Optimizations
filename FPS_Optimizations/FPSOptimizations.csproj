@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<RootNamespace>FPS_Optimizations</RootNamespace>
+		<AssemblyName>FPS_Optimizations</AssemblyName>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<ModFolderName>PaLoALo-V2-FPS_Optimizations</ModFolderName>
+	</PropertyGroup>
+	
+	<ItemGroup>
+	  <Docs Include="docs\OptimizationPatches.md" />
+	</ItemGroup>
+
+	<Target Name="CopyDocs" AfterTargets="Build">
+	  <Copy SourceFiles="@(Docs)" DestinationFolder="$(OutputPath)\docs" SkipUnchangedFiles="true" />
+	</Target>
+
+</Project>

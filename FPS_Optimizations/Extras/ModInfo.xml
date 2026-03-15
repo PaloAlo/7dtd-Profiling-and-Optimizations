@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<xml>
+    <Name value="FPSOptimizations" />
+    <DisplayName value="PaLoALo FPS Optimizations" />
+    <Description value="Lightweight FPS optimization patches for 7 Days to Die" />
+    <Author value="PaLoALo" />
+    <Version value="2.6.0.1" compat="2.6" />
+    <Website value="https://next.nexusmods.com/profile/PaLoALo" />
+	<SkipWithAntiCheat value="false" />
+</xml>

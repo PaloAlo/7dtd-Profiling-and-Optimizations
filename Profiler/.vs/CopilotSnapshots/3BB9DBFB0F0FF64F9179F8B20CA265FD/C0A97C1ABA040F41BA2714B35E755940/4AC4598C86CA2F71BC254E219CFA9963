@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<RootNamespace>Profiler</RootNamespace>
+		<AssemblyName>Profiler</AssemblyName>
+	</PropertyGroup>
+
+	<!-- Override the mod folder name -->
+	<PropertyGroup>
+		<ModFolderName>PaLoALo-V2-Profiler</ModFolderName>
+	</PropertyGroup>
+	<ItemGroup>
+	  <Compile Remove="src\Patches\OverridePatcher.cs" />
+	</ItemGroup>
+	
+	<ItemGroup>
+	  <Docs Include="docs\OptimizationPatches.md" />
+	</ItemGroup>
+
+	<Target Name="CopyDocs" AfterTargets="Build">
+	  <Copy SourceFiles="@(Docs)" DestinationFolder="$(OutputPath)\docs" SkipUnchangedFiles="true" />
+	</Target>
+
+	<ItemGroup>
+	  <None Include=".github\copilot-instructions.md" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="src\Optimization\" />
+	</ItemGroup>
+
+ </Project>

@@ -1,0 +1,74 @@
+﻿// TargetCachePatch.cs
+//
+// Cache attack/revenge target lookups per frame to reduce 100K+ calls
+
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntityAlive), nameof(EntityAlive.GetAttackTarget))]
+static class GetAttackTargetCachePatch
+{
+    private static readonly Dictionary<int, (int frame, EntityAlive target)> s_cache = new(256);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool Prefix(EntityAlive __instance, ref EntityAlive __result)
+    {
+        if (!ProfilerConfig.Current.EnableTargetCache) return true;
+
+        int frame = Time.frameCount;
+        int id = __instance.entityId;
+
+        if (s_cache.TryGetValue(id, out var cached) && cached.frame == frame)
+        {
+            __result = cached.target;
+            ProfilingUtils.PerFrameCounters.Increment("GetAttackTarget.CacheHit");
+            return false;
+        }
+
+        ProfilingUtils.PerFrameCounters.Increment("GetAttackTarget.CacheMiss");
+        return true;
+    }
+
+    public static void Postfix(EntityAlive __instance, EntityAlive __result)
+    {
+        if (!ProfilerConfig.Current.EnableTargetCache) return;
+        s_cache[__instance.entityId] = (Time.frameCount, __result);
+    }
+
+    public static void OnEntityRemoved(int entityId) => s_cache.Remove(entityId);
+}
+
+[HarmonyPatch(typeof(EntityAlive), nameof(EntityAlive.GetRevengeTarget))]
+static class GetRevengeTargetCachePatch
+{
+    private static readonly Dictionary<int, (int frame, EntityAlive target)> s_cache = new(256);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool Prefix(EntityAlive __instance, ref EntityAlive __result)
+    {
+        if (!ProfilerConfig.Current.EnableTargetCache) return true;
+
+        int frame = Time.frameCount;
+        int id = __instance.entityId;
+
+        if (s_cache.TryGetValue(id, out var cached) && cached.frame == frame)
+        {
+            __result = cached.target;
+            ProfilingUtils.PerFrameCounters.Increment("GetRevengeTarget.CacheHit");
+            return false;
+        }
+
+        ProfilingUtils.PerFrameCounters.Increment("GetRevengeTarget.CacheMiss");
+        return true;
+    }
+
+    public static void Postfix(EntityAlive __instance, EntityAlive __result)
+    {
+        if (!ProfilerConfig.Current.EnableTargetCache) return;
+        s_cache[__instance.entityId] = (Time.frameCount, __result);
+    }
+
+    public static void OnEntityRemoved(int entityId) => s_cache.Remove(entityId);
+}

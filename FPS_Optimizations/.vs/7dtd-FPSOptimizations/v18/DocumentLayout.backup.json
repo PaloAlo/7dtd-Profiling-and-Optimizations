@@ -1,0 +1,381 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\zombieframeskippatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\zombieframeskippatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\blocktriggerrefreshfinalizerpatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\blocktriggerrefreshfinalizerpatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\entitycleanuppatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\entitycleanuppatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\modinit.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\modinit.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimizationconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimizationconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\voxelfastrejectpatches.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\voxelfastrejectpatches.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\updatetaskslodpatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\updatetaskslodpatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\throttlestepsoundpatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\throttlestepsoundpatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\targetcachepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\targetcachepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\speedstrafethrottlepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\speedstrafethrottlepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\sharedplayervisibilitypatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\sharedplayervisibilitypatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\playerupdatethrottlepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\playerupdatethrottlepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\movespeedcachepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\movespeedcachepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\movehelperthrottlepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\movehelperthrottlepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\moveentityheadedlodpatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\moveentityheadedlodpatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\framecache.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\framecache.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\findpathcachepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\findpathcachepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\entitycollisionthrottlepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\entitycollisionthrottlepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\eaitaskevaluationthrottlepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\eaitaskevaluationthrottlepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\attacktargetnullcheckpatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\attacktargetnullcheckpatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\adaptivethresholds.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\adaptivethresholds.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 5,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "OptimizationConfig.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\OptimizationConfig.cs",
+              "RelativeDocumentMoniker": "src\\OptimizationConfig.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\OptimizationConfig.cs",
+              "RelativeToolTip": "src\\OptimizationConfig.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:25.397Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{40ea2e6b-2121-4bb8-a43e-c83c04b51041}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "ModInit.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\ModInit.cs",
+              "RelativeDocumentMoniker": "src\\ModInit.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\ModInit.cs",
+              "RelativeToolTip": "src\\ModInit.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:29.828Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "EntityCleanupPatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\EntityCleanupPatch.cs",
+              "RelativeDocumentMoniker": "src\\EntityCleanupPatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\EntityCleanupPatch.cs",
+              "RelativeToolTip": "src\\EntityCleanupPatch.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:29.75Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "BlockTriggerRefreshFinalizerPatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\BlockTriggerRefreshFinalizerPatch.cs",
+              "RelativeDocumentMoniker": "src\\BlockTriggerRefreshFinalizerPatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\BlockTriggerRefreshFinalizerPatch.cs",
+              "RelativeToolTip": "src\\BlockTriggerRefreshFinalizerPatch.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:29.655Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "ZombieFrameSkipPatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\ZombieFrameSkipPatch.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\ZombieFrameSkipPatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\ZombieFrameSkipPatch.cs",
+              "RelativeToolTip": "src\\Optimization\\ZombieFrameSkipPatch.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAAAqAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:29.578Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "VoxelFastRejectPatches.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\VoxelFastRejectPatches.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\VoxelFastRejectPatches.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\VoxelFastRejectPatches.cs",
+              "RelativeToolTip": "src\\Optimization\\VoxelFastRejectPatches.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:29.498Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "UpdateTasksLODPatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\UpdateTasksLODPatch.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\UpdateTasksLODPatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\UpdateTasksLODPatch.cs",
+              "RelativeToolTip": "src\\Optimization\\UpdateTasksLODPatch.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:29.418Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "ThrottleStepSoundPatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\ThrottleStepSoundPatch.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\ThrottleStepSoundPatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\ThrottleStepSoundPatch.cs",
+              "RelativeToolTip": "src\\Optimization\\ThrottleStepSoundPatch.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:29.34Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "TargetCachePatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\TargetCachePatch.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\TargetCachePatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\TargetCachePatch.cs",
+              "RelativeToolTip": "src\\Optimization\\TargetCachePatch.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:29.262Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "SpeedStrafeThrottlePatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\SpeedStrafeThrottlePatch.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\SpeedStrafeThrottlePatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\SpeedStrafeThrottlePatch.cs",
+              "RelativeToolTip": "src\\Optimization\\SpeedStrafeThrottlePatch.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:29.166Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "SharedPlayerVisibilityPatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\SharedPlayerVisibilityPatch.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\SharedPlayerVisibilityPatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\SharedPlayerVisibilityPatch.cs",
+              "RelativeToolTip": "src\\Optimization\\SharedPlayerVisibilityPatch.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:29.089Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "PlayerUpdateThrottlePatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\PlayerUpdateThrottlePatch.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\PlayerUpdateThrottlePatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\PlayerUpdateThrottlePatch.cs",
+              "RelativeToolTip": "src\\Optimization\\PlayerUpdateThrottlePatch.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:29.012Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "MoveSpeedCachePatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\MoveSpeedCachePatch.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\MoveSpeedCachePatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\MoveSpeedCachePatch.cs",
+              "RelativeToolTip": "src\\Optimization\\MoveSpeedCachePatch.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:28.936Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "MoveHelperThrottlePatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\MoveHelperThrottlePatch.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\MoveHelperThrottlePatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\MoveHelperThrottlePatch.cs",
+              "RelativeToolTip": "src\\Optimization\\MoveHelperThrottlePatch.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:28.859Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 14,
+              "Title": "MoveEntityHeadedLODPatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\MoveEntityHeadedLODPatch.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\MoveEntityHeadedLODPatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\MoveEntityHeadedLODPatch.cs",
+              "RelativeToolTip": "src\\Optimization\\MoveEntityHeadedLODPatch.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:28.783Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 15,
+              "Title": "FrameCache.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\FrameCache.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\FrameCache.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\FrameCache.cs",
+              "RelativeToolTip": "src\\Optimization\\FrameCache.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:28.686Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 16,
+              "Title": "FindPathCachePatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\FindPathCachePatch.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\FindPathCachePatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\FindPathCachePatch.cs",
+              "RelativeToolTip": "src\\Optimization\\FindPathCachePatch.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:28.601Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 17,
+              "Title": "EntityCollisionThrottlePatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\EntityCollisionThrottlePatch.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\EntityCollisionThrottlePatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\EntityCollisionThrottlePatch.cs",
+              "RelativeToolTip": "src\\Optimization\\EntityCollisionThrottlePatch.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:28.518Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 18,
+              "Title": "EAITaskEvaluationThrottlePatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\EAITaskEvaluationThrottlePatch.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\EAITaskEvaluationThrottlePatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\EAITaskEvaluationThrottlePatch.cs",
+              "RelativeToolTip": "src\\Optimization\\EAITaskEvaluationThrottlePatch.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:28.439Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 19,
+              "Title": "AttackTargetNullCheckPatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\AttackTargetNullCheckPatch.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\AttackTargetNullCheckPatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\AttackTargetNullCheckPatch.cs",
+              "RelativeToolTip": "src\\Optimization\\AttackTargetNullCheckPatch.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:28.349Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 20,
+              "Title": "AdaptiveThresholds.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\AdaptiveThresholds.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\AdaptiveThresholds.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\AdaptiveThresholds.cs",
+              "RelativeToolTip": "src\\Optimization\\AdaptiveThresholds.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T01:35:28.251Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -2,19 +2,16 @@
 
 using System;
 using System.Collections.Generic;
-using HarmonyLib;
-using UnityEngine;
 
 // Console command to reload profiler config at runtime and apply side-effects
-// Usage in-game (SdtdConsole): profiler.reload
-// Also accepts optional "apply" to force apply even if no change.
+// Usage in-game (SdtdConsole): profiler-reload
 public class ConsoleCmdProfilerConfigReload : ConsoleCmdAbstract
 {
     public override string[] getCommands() => new[] { "profiler-reload", "pr-reload" };
 
     public override string getDescription() => "Reload profiler_config.json and apply runtime changes.";
 
-    public override string getHelp() => "Usage: profiler-reload\r\nReloads the profiler JSON config and applies live changes.\r\nNo restart required for most settings. Some changes (deep structural ones) may still require a restart.";
+    public override string getHelp() => "Usage: profiler-reload\r\nReloads the profiler JSON config and applies live changes.\r\nNo restart required for most settings.";
     public override void Execute(List<string> _params, CommandSenderInfo _senderInfo)
     {
         try
@@ -29,49 +26,12 @@ public class ConsoleCmdProfilerConfigReload : ConsoleCmdAbstract
                 return;
             }
 
-            // Spatial grid
-            try
-            {
-                if (cfg.EnableSpatialGrid)
-                {
-                    SpatialGridManager.Init();
-                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: SpatialGrid enabled (initialized).");
-                }
-                else
-                {
-                    SpatialGridManager.Shutdown();
-                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: SpatialGrid disabled (shut down).");
-                }
-            }
-            catch (Exception e)
-            {
-                SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Profiler: SpatialGrid apply failed: {e.Message}");
-            }
+            SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Profiler: EnableProfiling={cfg.EnableProfiling}");
 
-            // LOD toggles
-            SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Profiler: EnableMoveLOD={cfg.EnableMoveLOD}, EnableTargetCache={cfg.EnableTargetCache}");
-
-            // Instrumentation toggle
-            try
-            {
-                if (cfg.EnableDeepPhysicsInstrumentation)
-                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: Deep physics instrumentation ENABLED.");
-                else
-                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: Deep physics instrumentation DISABLED.");
-            }
-            catch { /* ignore */ }
-
-            // Clear or reset runtime caches
-            try
-            {
-                try { FindPathCachePatch.CleanupStale(); } catch { }
-
-                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: Runtime caches cleaned (best-effort).");
-            }
-            catch (Exception e)
-            {
-                SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Profiler: Runtime cache cleanup failed: {e.Message}");
-            }
+            if (cfg.EnableDeepPhysicsInstrumentation)
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: Deep physics instrumentation ENABLED.");
+            else
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: Deep physics instrumentation DISABLED.");
 
             SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: Reload complete.");
         }
