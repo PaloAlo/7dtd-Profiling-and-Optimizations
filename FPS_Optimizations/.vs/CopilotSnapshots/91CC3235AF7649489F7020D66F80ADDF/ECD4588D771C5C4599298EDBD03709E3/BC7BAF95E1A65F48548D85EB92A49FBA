@@ -1,4 +1,4 @@
-// BlockPosUpdateThrottlePatch.cs
+﻿// BlockPosUpdateThrottlePatch.cs
 //
 // Distance-based throttling for EntityAlive.updateCurrentBlockPosAndValue.
 // This method updates the entity's knowledge of which block it occupies —
@@ -35,18 +35,13 @@ public static class BlockPosUpdateThrottlePatch
             if (zombieCount < AdaptiveThresholds.EmergencyZombieThreshold)
                 return true;
 
+            float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
+            if (distSq < CLOSE_DIST_SQ) return true;
+
             bool criticalMode = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
 
-            float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
-
             int interval;
-            if (distSq < CLOSE_DIST_SQ)
-            {
-                // Close entities: only throttle under critical load
-                if (!criticalMode) return true;
-                interval = 2;
-            }
-            else if (distSq < MID_DIST_SQ)
+            if (distSq < MID_DIST_SQ)
             {
                 interval = criticalMode ? 3 : 2;
             }

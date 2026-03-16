@@ -1,4 +1,4 @@
-// MoveEntityHeadedLODPatch.cs
+﻿// MoveEntityHeadedLODPatch.cs
 //
 // Distance-based throttling for EntityAlive.MoveEntityHeaded — the single
 // most expensive per-entity method.

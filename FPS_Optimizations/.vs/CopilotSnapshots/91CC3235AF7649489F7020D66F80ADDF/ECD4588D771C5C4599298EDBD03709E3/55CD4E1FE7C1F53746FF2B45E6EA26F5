@@ -1,14 +1,10 @@
-// UpdateTasksLODPatch.cs
+﻿// UpdateTasksLODPatch.cs
 //
 // Distance-based throttling for EntityAlive.updateTasks (AI task evaluation).
 // On throttled frames only lightweight housekeeping runs (despawn, seeCache).
-//
-// V2 — Combat Frame Stagger:  When zombie count exceeds the combat-stagger
-// threshold, even close-range and combat-engaged entities are staggered.
-// On staggered frames RunMinimalMaintenance() still fires so despawn/seeCache
-// stay healthy.
 
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using HarmonyLib;
 using UnityEngine;
 
@@ -44,39 +40,17 @@ public static class UpdateTasksLODPatch
 
             float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
 
+            // Combat/alert entities must ALWAYS run updateTasks at full rate.
+            // ContinueExecuting() on the active AI task must fire every frame
+            // to keep MoveHelper direction, animation speed, and task state coherent.
             bool inCombat = __instance.GetAttackTarget() != null
                          || __instance.GetRevengeTarget() != null
                          || __instance.hasBeenAttackedTime > 0
                          || __instance.isAlert
                          || __instance.HasInvestigatePosition;
 
-            // ── Combat Frame Stagger ──────────────────────────────────
-            bool combatStagger = OptimizationConfig.Current.EnableCombatStagger
-                              && zombieCount >= OptimizationConfig.Current.CombatStaggerZombieThreshold;
-
-            if (combatStagger && (inCombat || distSq < CLOSE_DIST_SQ))
-            {
-                int staggerInterval = criticalMode ? 3 : 2;
-
-                if (!s_lastAIUpdateFrame.TryGetValue(entityId, out int lastFrame))
-                {
-                    s_lastAIUpdateFrame[entityId] = currentFrame;
-                    return true;
-                }
-
-                if (currentFrame - lastFrame >= staggerInterval)
-                {
-                    s_lastAIUpdateFrame[entityId] = currentFrame;
-                    return true;
-                }
-
-                RunMinimalMaintenance(__instance);
-                ProfilerCounterBridge.Increment("updateTasks.CombatStaggered");
-                return false;
-            }
-
-            // ── Original distance-based LOD (non-combat, outside close range) ──
             if (inCombat) return true;
+
             if (distSq < CLOSE_DIST_SQ) return true;
 
             int interval;
@@ -99,13 +73,13 @@ public static class UpdateTasksLODPatch
 
             if (interval <= 1) return true;
 
-            if (!s_lastAIUpdateFrame.TryGetValue(entityId, out int lastFrame2))
+            if (!s_lastAIUpdateFrame.TryGetValue(entityId, out int lastFrame))
             {
                 s_lastAIUpdateFrame[entityId] = currentFrame;
                 return true;
             }
 
-            if (currentFrame - lastFrame2 >= interval)
+            if (currentFrame - lastFrame >= interval)
             {
                 s_lastAIUpdateFrame[entityId] = currentFrame;
                 return true;

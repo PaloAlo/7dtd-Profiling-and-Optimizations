@@ -1,14 +1,8 @@
-// MoveEntityHeadedLODPatch.cs
+﻿// MoveEntityHeadedLODPatch.cs
 //
 // Distance-based throttling for EntityAlive.MoveEntityHeaded — the single
-// most expensive per-entity method.
-//
-// V2 — Combat Frame Stagger:  When zombie count exceeds the combat-stagger
-// threshold, even close-range and combat-engaged entities are staggered
-// across frames using entity-ID modulo.  At 15-20 FPS each zombie already
-// only renders every 3-4 visual frames; skipping 1 frame of movement math
-// for half of them per frame is imperceptible but cuts the #1 CPU cost
-// by ~40-50% during peak POI fights.
+// most expensive per-entity method.  Combat-engaged entities always run
+// at full rate (any distance).  Only idle/non-combat entities are throttled.
 
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -33,16 +27,17 @@ public static class MoveEntityHeadedLODPatch
         {
             if (__instance.IsSleeping) return true;
 
-            int entityId = __instance.entityId;
-            int zombieCount = FrameCache.ZombieCount;
-            bool emergencyMode = zombieCount >= AdaptiveThresholds.EmergencyZombieThreshold;
-            bool criticalMode = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
-
             float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
 
             float tier1Sq = OptimizationConfig.Current.MoveLODTier1DistSq;
             float tier2Sq = OptimizationConfig.Current.MoveLODTier2DistSq;
             float tier3Sq = OptimizationConfig.Current.MoveLODTier3DistSq;
+
+            if (distSq < tier1Sq) return true;
+
+            int zombieCount = FrameCache.ZombieCount;
+            bool emergencyMode = zombieCount >= AdaptiveThresholds.EmergencyZombieThreshold;
+            bool criticalMode = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
 
             bool inCombat = __instance.GetAttackTarget() != null
                          || __instance.GetRevengeTarget() != null
@@ -50,30 +45,7 @@ public static class MoveEntityHeadedLODPatch
                          || __instance.isAlert
                          || __instance.HasInvestigatePosition;
 
-            // ── Combat Frame Stagger ──────────────────────────────────
-            // When zombie count is high enough, stagger ALL entities
-            // (including close-range and in-combat) across frames.
-            bool combatStagger = OptimizationConfig.Current.EnableCombatStagger
-                              && zombieCount >= OptimizationConfig.Current.CombatStaggerZombieThreshold;
-
-            if (combatStagger && (inCombat || distSq < tier1Sq))
-            {
-                int staggerInterval = criticalMode ? 3 : 2;
-                int frameSlot = Time.frameCount % staggerInterval;
-                int entitySlot = (entityId & 0x7FFFFFFF) % staggerInterval;
-
-                if (frameSlot != entitySlot)
-                {
-                    ProfilerCounterBridge.Increment("MoveEntityHeaded.CombatStaggered");
-                    return false;
-                }
-
-                s_lastUpdateFrame[entityId] = Time.frameCount;
-                return true;
-            }
-
-            // ── Original distance-based LOD (non-combat, outside tier1) ──
-            if (distSq < tier1Sq) return true;
+            // Combat-engaged entities always run movement at full rate
             if (inCombat) return true;
 
             int skipInterval;
@@ -92,10 +64,11 @@ public static class MoveEntityHeadedLODPatch
 
             if (skipInterval <= 1) return true;
 
-            int frameSlot2 = Time.frameCount % skipInterval;
-            int entitySlot2 = (entityId & 0x7FFFFFFF) % skipInterval;
+            int entityId = __instance.entityId;
+            int frameSlot = Time.frameCount % skipInterval;
+            int entitySlot = (entityId & 0x7FFFFFFF) % skipInterval;
 
-            if (frameSlot2 == entitySlot2)
+            if (frameSlot == entitySlot)
             {
                 s_lastUpdateFrame[entityId] = Time.frameCount;
                 return true;

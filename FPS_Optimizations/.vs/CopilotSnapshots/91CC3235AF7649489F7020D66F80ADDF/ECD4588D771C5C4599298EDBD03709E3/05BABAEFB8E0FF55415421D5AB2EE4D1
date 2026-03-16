@@ -1,4 +1,4 @@
-// BlockPosUpdateThrottlePatch.cs
+﻿// BlockPosUpdateThrottlePatch.cs
 //
 // Distance-based throttling for EntityAlive.updateCurrentBlockPosAndValue.
 // This method updates the entity's knowledge of which block it occupies —

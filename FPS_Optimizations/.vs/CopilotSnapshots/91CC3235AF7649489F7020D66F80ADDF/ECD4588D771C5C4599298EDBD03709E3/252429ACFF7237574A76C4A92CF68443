@@ -1,4 +1,4 @@
-// OptimizationConfig.cs
+﻿// OptimizationConfig.cs
 
 using System;
 using System.IO;
@@ -32,15 +32,8 @@ public class OptimizationConfig
     // Throttle updateCurrentBlockPosAndValue for distant entities
     public bool EnableBlockPosThrottle = true;
 
-    // Combat Frame Stagger — stagger even close-range/combat entities when
-    // zombie count exceeds a threshold.  At 15-20 FPS each entity only renders
-    // every 3-4 visual frames anyway; skipping 1 frame of movement math for
-    // half the entities per frame is imperceptible but cuts CPU cost ~40-50%.
-    public bool EnableCombatStagger = true;
-    public int CombatStaggerZombieThreshold = 40;
-
     public const string ConfigFileName = "fps_optimization_config.json";
-    private const int ConfigVersion = 2;
+    private const int ConfigVersion = 1;
     public int Version = ConfigVersion;
 
     public static OptimizationConfig Current { get; private set; } = new OptimizationConfig();

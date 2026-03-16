@@ -14,6 +14,22 @@ public static class ProfilerCounterBridge
     private static Action<string, long> s_increment;
     private static bool s_resolved;
 
+    // New: expose availability and explicit resolver
+    public static bool IsProfilerAvailable
+    {
+        get
+        {
+            if (!s_resolved) Resolve();
+            return s_increment != null;
+        }
+    }
+
+    // allow explicit resolution call at startup
+    public static void EnsureResolved()
+    {
+        if (!s_resolved) Resolve();
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Increment(string key, long amount = 1)
     {
