@@ -3,47 +3,28 @@
   "WorkspaceRootPath": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_RECOVERY_FAIL_z19_fps68_20260315_105511.csv||{8B382828-6202-11D1-8870-0000F87579D2}"
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimizationconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimizationconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_RECOVERY_FAIL_z17_fps58_20260315_101710.csv||{8B382828-6202-11D1-8870-0000F87579D2}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_FPS_DROP_z50_fps50_20260315_090044.csv||{8B382828-6202-11D1-8870-0000F87579D2}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_FPS_DROP_z117_fps34_20260315_090114.csv||{8B382828-6202-11D1-8870-0000F87579D2}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_LOW_FPS_z103_fps28_20260315_090144.csv||{8B382828-6202-11D1-8870-0000F87579D2}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_LOW_FPS_z100_fps21_20260315_090214.csv||{8B382828-6202-11D1-8870-0000F87579D2}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_RECOVERY_FAIL_z18_fps69_20260315_092409.csv||{8B382828-6202-11D1-8870-0000F87579D2}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_LOW_FPS_z87_fps20_20260315_090244.csv||{8B382828-6202-11D1-8870-0000F87579D2}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_profile.csv||{8B382828-6202-11D1-8870-0000F87579D2}"
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\adaptivethresholds.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\adaptivethresholds.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\blockposupdatethrottlepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\blockposupdatethrottlepatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\entitycleanuppatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\entitycleanuppatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\framecache.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\framecache.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimizationconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimizationconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\entitycleanuppatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\entitycleanuppatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\updatetaskslodpatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\updatetaskslodpatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -53,7 +34,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 12,
+          "SelectedChildIndex": 3,
           "Children": [
             {
               "$type": "Bookmark",
@@ -61,46 +42,72 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 12,
+              "DocumentIndex": 5,
+              "Title": "UpdateTasksLODPatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\UpdateTasksLODPatch.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\UpdateTasksLODPatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\UpdateTasksLODPatch.cs",
+              "RelativeToolTip": "src\\Optimization\\UpdateTasksLODPatch.cs",
+              "ViewState": "AgIAACsAAAAAAAAAAABOwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-16T05:11:04.297Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "AdaptiveThresholds.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\AdaptiveThresholds.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\AdaptiveThresholds.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\AdaptiveThresholds.cs",
+              "RelativeToolTip": "src\\Optimization\\AdaptiveThresholds.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-16T05:00:34.429Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
               "Title": "OptimizationConfig.cs",
               "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\OptimizationConfig.cs",
               "RelativeDocumentMoniker": "src\\OptimizationConfig.cs",
               "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\OptimizationConfig.cs",
               "RelativeToolTip": "src\\OptimizationConfig.cs",
-              "ViewState": "AgIAAB4AAAAAAAAAAABOwAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABEAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-03-15T11:20:15.243Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 11,
+              "DocumentIndex": 3,
               "Title": "FrameCache.cs",
               "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\FrameCache.cs",
               "RelativeDocumentMoniker": "src\\Optimization\\FrameCache.cs",
               "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\FrameCache.cs",
               "RelativeToolTip": "src\\Optimization\\FrameCache.cs",
-              "ViewState": "AgIAAF8AAAAAAAAAAABOwAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-03-15T11:20:15.182Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 10,
+              "DocumentIndex": 4,
               "Title": "EntityCleanupPatch.cs",
               "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\EntityCleanupPatch.cs",
               "RelativeDocumentMoniker": "src\\EntityCleanupPatch.cs",
               "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\EntityCleanupPatch.cs",
               "RelativeToolTip": "src\\EntityCleanupPatch.cs",
-              "ViewState": "AgIAABQAAAAAAAAAAABOwAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-03-15T11:20:15.125Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 9,
+              "DocumentIndex": 2,
               "Title": "BlockPosUpdateThrottlePatch.cs",
               "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\BlockPosUpdateThrottlePatch.cs",
               "RelativeDocumentMoniker": "src\\Optimization\\BlockPosUpdateThrottlePatch.cs",
@@ -109,105 +116,6 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAFMAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-03-15T11:20:00.923Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "7dtd_HIGHLOAD_FPS_DROP_z50_fps50_20260315_090044.csv",
-              "DocumentMoniker": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_FPS_DROP_z50_fps50_20260315_090044.csv",
-              "ToolTip": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_FPS_DROP_z50_fps50_20260315_090044.csv",
-              "ViewState": "AgIAAEUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002120|",
-              "WhenOpened": "2026-03-15T11:11:45.4Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 3,
-              "Title": "7dtd_HIGHLOAD_FPS_DROP_z117_fps34_20260315_090114.csv",
-              "DocumentMoniker": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_FPS_DROP_z117_fps34_20260315_090114.csv",
-              "ToolTip": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_FPS_DROP_z117_fps34_20260315_090114.csv",
-              "ViewState": "AgIAAEIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002120|",
-              "WhenOpened": "2026-03-15T11:11:45.321Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 4,
-              "Title": "7dtd_HIGHLOAD_LOW_FPS_z103_fps28_20260315_090144.csv",
-              "DocumentMoniker": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_LOW_FPS_z103_fps28_20260315_090144.csv",
-              "ToolTip": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_LOW_FPS_z103_fps28_20260315_090144.csv",
-              "ViewState": "AgIAAEIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002120|",
-              "WhenOpened": "2026-03-15T11:11:45.265Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 5,
-              "Title": "7dtd_HIGHLOAD_LOW_FPS_z100_fps21_20260315_090214.csv",
-              "DocumentMoniker": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_LOW_FPS_z100_fps21_20260315_090214.csv",
-              "ToolTip": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_LOW_FPS_z100_fps21_20260315_090214.csv",
-              "ViewState": "AgIAAEUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002120|",
-              "WhenOpened": "2026-03-15T11:11:45.195Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 7,
-              "Title": "7dtd_HIGHLOAD_LOW_FPS_z87_fps20_20260315_090244.csv",
-              "DocumentMoniker": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_LOW_FPS_z87_fps20_20260315_090244.csv",
-              "ToolTip": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_LOW_FPS_z87_fps20_20260315_090244.csv",
-              "ViewState": "AgIAAEsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002120|",
-              "WhenOpened": "2026-03-15T11:11:45.116Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 6,
-              "Title": "7dtd_HIGHLOAD_RECOVERY_FAIL_z18_fps69_20260315_092409.csv",
-              "DocumentMoniker": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_RECOVERY_FAIL_z18_fps69_20260315_092409.csv",
-              "ToolTip": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_RECOVERY_FAIL_z18_fps69_20260315_092409.csv",
-              "ViewState": "AgIAAD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002120|",
-              "WhenOpened": "2026-03-15T11:11:45.052Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "7dtd_HIGHLOAD_RECOVERY_FAIL_z17_fps58_20260315_101710.csv",
-              "DocumentMoniker": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_RECOVERY_FAIL_z17_fps58_20260315_101710.csv",
-              "ToolTip": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_RECOVERY_FAIL_z17_fps58_20260315_101710.csv",
-              "ViewState": "AgIAAD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002120|",
-              "WhenOpened": "2026-03-15T11:11:44.973Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "7dtd_HIGHLOAD_RECOVERY_FAIL_z19_fps68_20260315_105511.csv",
-              "DocumentMoniker": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_RECOVERY_FAIL_z19_fps68_20260315_105511.csv",
-              "ToolTip": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_HIGHLOAD_RECOVERY_FAIL_z19_fps68_20260315_105511.csv",
-              "ViewState": "AgIAAD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002120|",
-              "WhenOpened": "2026-03-15T11:11:44.91Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 8,
-              "Title": "7dtd_profile.csv",
-              "DocumentMoniker": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_profile.csv",
-              "ToolTip": "C:\\Users\\Gamer\\AppData\\Roaming\\7DaysToDie\\Mods\\PaLoALo-V2-Profiler\\7dtd_profile.csv",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002120|",
-              "WhenOpened": "2026-03-15T11:11:44.813Z",
               "EditorCaption": ""
             }
           ]

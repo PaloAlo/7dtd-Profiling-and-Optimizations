@@ -1,4 +1,4 @@
-// UpdateTasksLODPatch.cs
+﻿// UpdateTasksLODPatch.cs
 //
 // Distance-based throttling for EntityAlive.updateTasks (AI task evaluation).
 // On throttled frames only lightweight housekeeping runs (despawn, seeCache).

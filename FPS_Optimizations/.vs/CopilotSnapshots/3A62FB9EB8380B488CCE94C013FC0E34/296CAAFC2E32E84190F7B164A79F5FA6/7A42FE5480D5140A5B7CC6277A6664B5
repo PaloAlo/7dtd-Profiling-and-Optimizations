@@ -1,4 +1,4 @@
-// UpdateTasksLODPatch.cs
+﻿// UpdateTasksLODPatch.cs
 //
 // Distance-based throttling for EntityAlive.updateTasks (AI task evaluation).
 // On throttled frames only lightweight housekeeping runs (despawn, seeCache).
@@ -40,18 +40,13 @@ public static class UpdateTasksLODPatch
 
             float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
 
-            // Combat/alert entities must ALWAYS run updateTasks at full rate.
-            // ContinueExecuting() on the active AI task must fire every frame
-            // to keep MoveHelper direction, animation speed, and task state coherent.
+            if (distSq < CLOSE_DIST_SQ) return true;
+
             bool inCombat = __instance.GetAttackTarget() != null
                          || __instance.GetRevengeTarget() != null
                          || __instance.hasBeenAttackedTime > 0
                          || __instance.isAlert
                          || __instance.HasInvestigatePosition;
-
-            if (inCombat) return true;
-
-            if (distSq < CLOSE_DIST_SQ) return true;
 
             int interval;
             if (distSq < MID_DIST_SQ)
@@ -70,6 +65,10 @@ public static class UpdateTasksLODPatch
             {
                 interval = criticalMode ? 6 : (emergencyMode ? 4 : 3);
             }
+
+            // Combat-engaged entities get gentler throttling (halved interval)
+            if (inCombat && interval > 2)
+                interval = System.Math.Max(2, (interval + 1) / 2);
 
             if (interval <= 1) return true;
 
