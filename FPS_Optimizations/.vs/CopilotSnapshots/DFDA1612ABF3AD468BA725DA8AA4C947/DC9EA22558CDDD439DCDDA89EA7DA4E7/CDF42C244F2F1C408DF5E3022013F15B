@@ -1,0 +1,100 @@
+﻿// FrameCache.cs
+//
+// Centralized per-frame cache: zombie count, player position, AI-off state,
+// and grace-period tracking.  Every optimization patch reads from here instead
+// of scanning the entity list or calling GamePrefs independently.
+
+using System.Runtime.CompilerServices;
+using UnityEngine;
+
+public static class FrameCache
+{
+    public static int ZombieCount { get; private set; }
+    public static Vector3 PlayerPosition { get; private set; }
+    public static bool HasPlayer { get; private set; }
+    public static bool IsAIDisabled { get; private set; }
+
+    private static int s_lastFrame = -1;
+    private static bool s_prevAIDisabled;
+    private static int s_gracePeriodEndFrame = -1;
+
+    /// <summary>
+    /// True when AI is off OR during the recovery grace period after AI resumes.
+    /// Every throttle-patch Prefix should return true (run vanilla) when this is set.
+    /// </summary>
+    public static bool ShouldBypassThrottling
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => IsAIDisabled || Time.frameCount < s_gracePeriodEndFrame;
+    }
+
+    public static void StartGracePeriod(int frames = 90)
+    {
+        s_gracePeriodEndFrame = Time.frameCount + frames;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void EnsureUpdated()
+    {
+        int frame = Time.frameCount;
+        if (s_lastFrame == frame) return;
+        s_lastFrame = frame;
+        Refresh();
+    }
+
+    private static void Refresh()
+    {
+        // --- AI toggle detection ---
+        bool aiOff = GamePrefs.GetBool(EnumGamePrefs.DebugStopEnemiesMoving);
+        if (s_prevAIDisabled && !aiOff)
+        {
+            StartGracePeriod(90);
+            ClearAllOptimizationCaches();
+        }
+        s_prevAIDisabled = aiOff;
+        IsAIDisabled = aiOff;
+
+        // --- World data ---
+        var world = GameManager.Instance?.World;
+        if (world == null)
+        {
+            ZombieCount = 0;
+            HasPlayer = false;
+            return;
+        }
+
+        var player = world.GetPrimaryPlayer();
+        if (player != null)
+        {
+            PlayerPosition = player.position;
+            HasPlayer = true;
+        }
+        else
+        {
+            HasPlayer = false;
+        }
+
+        int zombieCount = 0;
+        var entities = world.Entities.list;
+        for (int i = 0; i < entities.Count; i++)
+        {
+            var entity = entities[i];
+            if (entity != null && entity is EntityZombie)
+                zombieCount++;
+        }
+        ZombieCount = zombieCount;
+    }
+
+    public static void ClearAllOptimizationCaches()
+    {
+        ZombieFrameSkipPatch.ClearCaches();
+        MoveEntityHeadedLODPatch.ClearCaches();
+        UpdateTasksLODPatch.ClearCaches();
+        SpeedStrafeThrottlePatch.ClearCaches();
+        EntityCollisionThrottlePatch.ClearCaches();
+        MoveHelperThrottlePatch.ClearCaches();
+        MoveSpeedCachePatch.ClearCaches();
+        FindPathCachePatch.Clear();
+        BlockPosUpdateThrottlePatch.ClearCaches();
+    }
+}

@@ -253,7 +253,7 @@ public static class ProfilingUtils
 
         if (asm == null)
         {
-            LogUtil.Warn("Profiling: Assembly-CSharp not loaded yet; dynamic patches deferred.");
+            LogUtil.Warn("Assembly-CSharp not loaded yet; dynamic patches deferred.");
             return;
         }
 
@@ -270,7 +270,7 @@ public static class ProfilingUtils
 
             if (t == null)
             {
-                LogUtil.Debug($"Profiling: type '{typeName}' not found in Assembly-CSharp (skipping).");
+                LogUtil.Debug($"type '{typeName}' not found in Assembly-CSharp (skipping).");
                 continue;
             }
 
@@ -286,7 +286,7 @@ public static class ProfilingUtils
 
             if (methods == null || methods.Length == 0)
             {
-                LogUtil.Debug($"Profiling: type '{t.FullName}' found but method '{methodName}' not present (skipping).");
+                LogUtil.Debug($"type '{t.FullName}' found but method '{methodName}' not present (skipping).");
                 continue;
             }
 
@@ -309,7 +309,7 @@ public static class ProfilingUtils
                         {
                             harmony.Patch(baseDef, prefixInfo, postfixInfo);
                             patchedCountForTarget++;
-                            LogUtil.Debug($"Profiling: patched base {baseDef.DeclaringType?.FullName}.{baseDef.Name}");
+                            LogUtil.Debug($"patched base {baseDef.DeclaringType?.FullName}.{baseDef.Name}");
                             continue;
                         }
                         catch { }
@@ -317,14 +317,14 @@ public static class ProfilingUtils
                 }
                 catch (Exception ex)
                 {
-                    LogUtil.Debug($"Profiling: patch attempt failed for {m.DeclaringType?.FullName}.{m.Name}: {ex.Message}");
+                    LogUtil.Debug($"patch attempt failed for {m.DeclaringType?.FullName}.{m.Name}: {ex.Message}");
                 }
             }
 
             if (patchedCountForTarget == 0)
-                LogUtil.Warn($"Profiling: no methods patched for {typeName}.{methodName} (type found but no concrete/implementable methods)");
+                LogUtil.Warn($"no methods patched for {typeName}.{methodName} (type found but no concrete/implementable methods)");
             else
-                LogUtil.Info($"Profiling: patched {patchedCountForTarget} method(s) for {typeName}.{methodName}");
+                LogUtil.Info($"patched {patchedCountForTarget} method(s) for {typeName}.{methodName}");
         }
     }
 
@@ -369,7 +369,7 @@ public static class ProfilingUtils
 
             if (targetAsm == null)
             {
-                LogUtil.Warn($"Profiling: assembly '{assemblyNameOrFile}' not found among loaded assemblies");
+                LogUtil.Warn($"assembly '{assemblyNameOrFile}' not found among loaded assemblies");
                 return;
             }
 
@@ -379,7 +379,7 @@ public static class ProfilingUtils
 
             Type[] types;
             try { types = targetAsm.GetTypes(); }
-            catch (Exception ex) { LogUtil.Warn($"Profiling: failed to enumerate types in {assemblyNameOrFile}: {ex.Message}"); return; }
+            catch (Exception ex) { LogUtil.Warn($"failed to enumerate types in {assemblyNameOrFile}: {ex.Message}"); return; }
 
             foreach (var t in types)
             {
@@ -416,11 +416,11 @@ public static class ProfilingUtils
             var dir = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
             File.WriteAllText(path, sb.ToString());
-            LogUtil.Info($"Profiling: dumped assembly types for '{assemblyNameOrFile}' to {path}");
+            LogUtil.Info($"dumped assembly types for '{assemblyNameOrFile}' to {path}");
         }
         catch (Exception ex)
         {
-            LogUtil.Warn($"Profiling: DumpAssemblyTypes failed: {ex.Message}");
+            LogUtil.Warn($"DumpAssemblyTypes failed: {ex.Message}");
         }
     }
 

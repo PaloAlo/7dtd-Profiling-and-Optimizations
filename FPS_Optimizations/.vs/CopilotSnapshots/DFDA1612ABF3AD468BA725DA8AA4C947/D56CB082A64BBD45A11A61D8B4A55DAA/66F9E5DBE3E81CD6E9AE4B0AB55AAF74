@@ -1,0 +1,101 @@
+﻿// OptimizationConfig.cs
+
+using System;
+using System.IO;
+using System.Reflection;
+using Newtonsoft.Json;
+
+[Serializable]
+public class OptimizationConfig
+{
+    // LOD for MoveEntityHeaded + Collision + MoveHelper + SpeedStrafe + ZombieFrameSkip
+    public bool EnableMoveLOD = true;
+
+    // LOD distance thresholds (squared)
+    public float MoveLODTier1DistSq = 900f;      // 30m — never throttle closer
+    public float MoveLODTier2DistSq = 2500f;     // 50m
+    public float MoveLODTier3DistSq = 6400f;     // 80m
+
+    // LOD for updateTasks
+    public bool EnableStaggeredUpdate = true;
+
+    // Cache pathfinding duplicate-request blocking
+    public bool EnablePathCache = true;
+    public float PathCacheTTLSeconds = 1f;
+
+    // Cache GetAttackTarget / GetRevengeTarget per frame
+    public bool EnableTargetCache = true;
+
+    // Throttle step sound updates
+    public bool EnableStepSoundThrottle = true;
+
+    // Throttle updateCurrentBlockPosAndValue for distant entities
+    public bool EnableBlockPosThrottle = true;
+
+    // Combat Frame Stagger — stagger even close-range/combat entities when
+    // zombie count exceeds a threshold.  DISABLED by default: while it cuts
+    // MoveEntityHeaded and updateTasks CPU ~40-50%, it causes visible jerky
+    // movement, rubberbanding, path loss, and erratic airborne physics because
+    // it hard-skips navigator.UpdateNavigation(), moveHelper.UpdateMoveHelper(),
+    // and the entire MoveEntityHeaded physics step on staggered frames.
+    public bool EnableCombatStagger = false;
+    public int CombatStaggerZombieThreshold = 40;
+
+    public const string ConfigFileName = "fps_optimization_config.json";
+    private const int ConfigVersion = 3;
+    public int Version = ConfigVersion;
+
+    public static OptimizationConfig Current { get; private set; } = new OptimizationConfig();
+
+    public static void Load(string folder = null)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(folder))
+                folder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            string path = Path.Combine(folder, ConfigFileName);
+
+            if (File.Exists(path))
+            {
+                string json = File.ReadAllText(path);
+                var loaded = JsonConvert.DeserializeObject<OptimizationConfig>(json);
+                if (loaded != null)
+                {
+                    if (loaded.Version < ConfigVersion)
+                    {
+                        loaded.Version = ConfigVersion;
+                        Save(folder);
+                    }
+                    Current = loaded;
+                    return;
+                }
+            }
+
+            Current = new OptimizationConfig();
+            Save(folder);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"[FPSOptimizations] Failed to load config: {ex.Message}");
+            Current = new OptimizationConfig();
+        }
+    }
+
+    public static void Save(string folder = null)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(folder))
+                folder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            string path = Path.Combine(folder, ConfigFileName);
+            string json = JsonConvert.SerializeObject(Current, Formatting.Indented);
+            File.WriteAllText(path, json);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"[FPSOptimizations] Failed to save config: {ex.Message}");
+        }
+    }
+}

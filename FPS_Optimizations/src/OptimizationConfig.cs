@@ -32,15 +32,18 @@ public class OptimizationConfig
     // Throttle updateCurrentBlockPosAndValue for distant entities
     public bool EnableBlockPosThrottle = true;
 
-    // Combat Frame Stagger — stagger even close-range/combat entities when
-    // zombie count exceeds a threshold.  At 15-20 FPS each entity only renders
-    // every 3-4 visual frames anyway; skipping 1 frame of movement math for
-    // half the entities per frame is imperceptible but cuts CPU cost ~40-50%.
-    public bool EnableCombatStagger = true;
-    public int CombatStaggerZombieThreshold = 40;
+    // Speed-Curve LOD — reduce movement speed for distant zombies instead of
+    // frame-skipping.  All AI and physics still run every frame; distant
+    // zombies just move slower, creating natural stagger without breaking
+    // AI state machines, navigation, or CharacterController physics.
+    public bool EnableSpeedCurveLOD = true;
+    public int SpeedCurveZombieThreshold = 30;     // min zombies to activate
+    public float SpeedCurveCloseDistSq = 225f;     // 15m — full speed below
+    public float SpeedCurveFarDistSq = 6400f;      // 80m — min speed at/beyond
+    public float SpeedCurveMinMult = 0.35f;        // min speed multiplier (35%)
 
     public const string ConfigFileName = "fps_optimization_config.json";
-    private const int ConfigVersion = 2;
+    private const int ConfigVersion = 4;
     public int Version = ConfigVersion;
 
     public static OptimizationConfig Current { get; private set; } = new OptimizationConfig();

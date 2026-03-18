@@ -12,7 +12,7 @@ public class ModInit : IModApi
         // resolve profiler bridge early so we can log availability
         ProfilerCounterBridge.EnsureResolved();
 
-        var harmony = new Harmony("com.PaLoALo.fps_optimizations.7dtd");
+        var harmony = new Harmony("7dtd.PaLoALo.fps_optimizations");
         harmony.PatchAll(Assembly.GetExecutingAssembly());
 
         Log.Out($"[FPS_Optimizations] Loaded. MoveLOD={OptimizationConfig.Current.EnableMoveLOD}, TargetCache={OptimizationConfig.Current.EnableTargetCache}");

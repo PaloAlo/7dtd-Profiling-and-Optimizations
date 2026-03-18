@@ -1,8 +1,8 @@
 E:\GitHub\7dtd\my mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\FPS_Optimizations\bin\Debug\FPS_Optimizations.dll
+E:\GitHub\7dtd\my mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\FPS_Optimizations\bin\Debug\FPS_Optimizations.pdb
 E:\GitHub\7dtd\my mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\FPS_Optimizations\obj\Debug\FPSOptimizations.csproj.AssemblyReference.cache
 E:\GitHub\7dtd\my mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\FPS_Optimizations\obj\Debug\FPSOptimizations.GeneratedMSBuildEditorConfig.editorconfig
 E:\GitHub\7dtd\my mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\FPS_Optimizations\obj\Debug\FPSOptimizations.csproj.CoreCompileInputs.cache
-E:\GitHub\7dtd\my mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\FPS_Optimizations\obj\Debug\FPS_Optimizations.dll
-E:\GitHub\7dtd\my mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\FPS_Optimizations\bin\Debug\FPS_Optimizations.pdb
 E:\GitHub\7dtd\my mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\FPS_Optimizations\obj\Debug\FPSOptimizations.sourcelink.json
+E:\GitHub\7dtd\my mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\FPS_Optimizations\obj\Debug\FPS_Optimizations.dll
 E:\GitHub\7dtd\my mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\FPS_Optimizations\obj\Debug\FPS_Optimizations.pdb

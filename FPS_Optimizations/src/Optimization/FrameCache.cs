@@ -90,6 +90,7 @@ public static class FrameCache
         ZombieFrameSkipPatch.ClearCaches();
         MoveEntityHeadedLODPatch.ClearCaches();
         UpdateTasksLODPatch.ClearCaches();
+        EAITaskEvaluationThrottlePatch.ClearCaches();
         SpeedStrafeThrottlePatch.ClearCaches();
         EntityCollisionThrottlePatch.ClearCaches();
         MoveHelperThrottlePatch.ClearCaches();

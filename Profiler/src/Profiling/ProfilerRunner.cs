@@ -301,8 +301,8 @@ public class ProfilerRunner : MonoBehaviour
             sb.AppendLine("=== OPTIMIZATION EFFECTIVENESS ===");
             sb.AppendLine("# Shows how much work our patches skipped vs total calls");
 
-            WriteEffectiveness(sb, counters, "MoveEntityHeaded", "MoveEntityHeaded.LODSkipped", "MoveEntityHeaded.calls");
-            WriteEffectiveness(sb, counters, "updateTasks", "updateTasks.LODSkipped", "updateTasks.calls");
+            WriteEffectiveness(sb, counters, "MoveEntityHeaded.Lite", "MoveEntityHeaded.LiteMotion", "MoveEntityHeaded.calls");
+            WriteEffectiveness(sb, counters, "updateTasks.Lite", "updateTasks.LiteRun", "updateTasks.calls");
             WriteEffectiveness(sb, counters, "GetAttackTarget", "GetAttackTarget.CacheHit", "EntityAlive.GetAttackTarget.calls");
             WriteEffectiveness(sb, counters, "GetRevengeTarget", "GetRevengeTarget.CacheHit", "EntityAlive.GetRevengeTarget.calls");
             WriteEffectiveness(sb, counters, "EntityCollision", "EntityCollision.Skipped", "EntityCollision.Skipped");

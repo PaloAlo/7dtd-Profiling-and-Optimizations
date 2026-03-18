@@ -1,0 +1,102 @@
+﻿// OptimizationConfig.cs
+
+using System;
+using System.IO;
+using System.Reflection;
+using Newtonsoft.Json;
+
+[Serializable]
+public class OptimizationConfig
+{
+    // LOD for MoveEntityHeaded + Collision + MoveHelper + SpeedStrafe + ZombieFrameSkip
+    public bool EnableMoveLOD = true;
+
+    // LOD distance thresholds (squared)
+    public float MoveLODTier1DistSq = 900f;      // 30m — never throttle closer
+    public float MoveLODTier2DistSq = 2500f;     // 50m
+    public float MoveLODTier3DistSq = 6400f;     // 80m
+
+    // LOD for updateTasks
+    public bool EnableStaggeredUpdate = true;
+
+    // Cache pathfinding duplicate-request blocking
+    public bool EnablePathCache = true;
+    public float PathCacheTTLSeconds = 1f;
+
+    // Cache GetAttackTarget / GetRevengeTarget per frame
+    public bool EnableTargetCache = true;
+
+    // Throttle step sound updates
+    public bool EnableStepSoundThrottle = true;
+
+    // Throttle updateCurrentBlockPosAndValue for distant entities
+    public bool EnableBlockPosThrottle = true;
+
+    // Speed-Curve LOD — reduce movement speed for distant zombies instead of
+    // frame-skipping.  All AI and physics still run every frame; distant
+    // zombies just move slower, creating natural stagger without breaking
+    // AI state machines, navigation, or CharacterController physics.
+    public bool EnableSpeedCurveLOD = true;
+    public int SpeedCurveZombieThreshold = 30;     // min zombies to activate
+    public float SpeedCurveCloseDistSq = 225f;     // 15m — full speed below
+    public float SpeedCurveFarDistSq = 6400f;      // 80m — min speed at/beyond
+    public float SpeedCurveMinMult = 0.35f;        // min speed multiplier (35%)
+
+    public const string ConfigFileName = "fps_optimization_config.json";
+    private const int ConfigVersion = 4;
+    public int Version = ConfigVersion;
+
+    public static OptimizationConfig Current { get; private set; } = new OptimizationConfig();
+
+    public static void Load(string folder = null)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(folder))
+                folder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            string path = Path.Combine(folder, ConfigFileName);
+
+            if (File.Exists(path))
+            {
+                string json = File.ReadAllText(path);
+                var loaded = JsonConvert.DeserializeObject<OptimizationConfig>(json);
+                if (loaded != null)
+                {
+                    if (loaded.Version < ConfigVersion)
+                    {
+                        loaded.Version = ConfigVersion;
+                        Save(folder);
+                    }
+                    Current = loaded;
+                    return;
+                }
+            }
+
+            Current = new OptimizationConfig();
+            Save(folder);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"[FPSOptimizations] Failed to load config: {ex.Message}");
+            Current = new OptimizationConfig();
+        }
+    }
+
+    public static void Save(string folder = null)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(folder))
+                folder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            string path = Path.Combine(folder, ConfigFileName);
+            string json = JsonConvert.SerializeObject(Current, Formatting.Indented);
+            File.WriteAllText(path, json);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"[FPSOptimizations] Failed to save config: {ex.Message}");
+        }
+    }
+}

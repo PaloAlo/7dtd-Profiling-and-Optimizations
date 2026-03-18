@@ -1,14 +1,20 @@
 // MoveEntityHeadedLODPatch.cs
 //
-// Distance-based throttling for EntityAlive.MoveEntityHeaded — the single
-// most expensive per-entity method.
+// Distance-based throttling and speed-curve LOD for MoveEntityHeaded.
 //
-// V2 — Combat Frame Stagger:  When zombie count exceeds the combat-stagger
-// threshold, even close-range and combat-engaged entities are staggered
-// across frames using entity-ID modulo.  At 15-20 FPS each zombie already
-// only renders every 3-4 visual frames; skipping 1 frame of movement math
-// for half of them per frame is imperceptible but cuts the #1 CPU cost
-// by ~40-50% during peak POI fights.
+// V4 — Speed-Curve LOD:  Instead of frame-skipping combat/close entities
+// (which breaks AI state machines, causes jerky movement, disappearing
+// zombies, and path loss), we now reduce movement speed based on distance.
+// Distant zombies move slower, creating natural stagger without any
+// frame-skipping for combat-aware entities.
+//
+// - Close range (< 15m):  full speed, full update every frame
+// - Mid range (15–80m):   speed scales from 100% down to 35%
+// - Far non-combat:       distance LOD with lite motion (unchanged)
+//
+// All AI and physics still run every frame for combat entities.
+// CharacterController.Move() still runs, just with a smaller direction
+// vector, keeping entity behavior smooth and correct.
 
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -20,7 +26,7 @@ public static class MoveEntityHeadedLODPatch
 {
     private static readonly Dictionary<int, int> s_lastUpdateFrame = new Dictionary<int, int>(256);
 
-    public static bool Prefix(EntityAlive __instance, Vector3 _direction, bool _isDirAbsolute)
+    public static bool Prefix(EntityAlive __instance, ref Vector3 _direction, bool _isDirAbsolute)
     {
         if (!OptimizationConfig.Current.EnableMoveLOD) return true;
         if (__instance == null) return true;
@@ -32,6 +38,11 @@ public static class MoveEntityHeadedLODPatch
         try
         {
             if (__instance.IsSleeping) return true;
+
+            // Don't extrapolate entities with special movement modes
+            if (__instance.AttachedToEntity != null) return true;
+            if (__instance.jumpIsMoving) return true;
+            if (__instance.IsFlyMode.Value) return true;
 
             int entityId = __instance.entityId;
             int zombieCount = FrameCache.ZombieCount;
@@ -50,44 +61,40 @@ public static class MoveEntityHeadedLODPatch
                          || __instance.isAlert
                          || __instance.HasInvestigatePosition;
 
-            // ── Combat Frame Stagger ──────────────────────────────────
-            // When zombie count is high enough, stagger ALL entities
-            // (including close-range and in-combat) across frames.
-            bool combatStagger = OptimizationConfig.Current.EnableCombatStagger
-                              && zombieCount >= OptimizationConfig.Current.CombatStaggerZombieThreshold;
-
-            if (combatStagger && (inCombat || distSq < tier1Sq))
+            // ── Speed-Curve LOD ───────────────────────────────────────
+            // Reduce movement speed based on distance instead of skipping
+            // frames.  All AI/physics still runs every frame — distant
+            // zombies just move slower, creating a natural wave effect.
+            var cfg = OptimizationConfig.Current;
+            if (cfg.EnableSpeedCurveLOD
+                && zombieCount >= cfg.SpeedCurveZombieThreshold
+                && distSq > cfg.SpeedCurveCloseDistSq)
             {
-                int staggerInterval = criticalMode ? 3 : 2;
-                int frameSlot = Time.frameCount % staggerInterval;
-                int entitySlot = (entityId & 0x7FFFFFFF) % staggerInterval;
-
-                if (frameSlot != entitySlot)
-                {
-                    ProfilerCounterBridge.Increment("MoveEntityHeaded.CombatStaggered");
-                    return false;
-                }
-
-                s_lastUpdateFrame[entityId] = Time.frameCount;
-                return true;
+                float t = Mathf.InverseLerp(cfg.SpeedCurveCloseDistSq, cfg.SpeedCurveFarDistSq, distSq);
+                float speedMult = Mathf.Lerp(1f, cfg.SpeedCurveMinMult, t);
+                _direction *= speedMult;
+                ProfilerCounterBridge.Increment("MoveSpeed.Curved");
             }
 
-            // ── Original distance-based LOD (non-combat, outside tier1) ──
+            // ── Distance-based LOD (non-combat, outside tier1) ──
             if (distSq < tier1Sq) return true;
             if (inCombat) return true;
 
+            // Scale distance LOD intervals — at extreme counts, even mid-range
+            // entities get more aggressive throttling.
+            bool siegeMode = zombieCount >= 100;
             int skipInterval;
             if (distSq < tier2Sq)
             {
-                skipInterval = criticalMode ? 3 : (emergencyMode ? 2 : 1);
+                skipInterval = siegeMode ? 4 : (criticalMode ? 3 : (emergencyMode ? 2 : 1));
             }
             else if (distSq < tier3Sq)
             {
-                skipInterval = criticalMode ? 4 : (emergencyMode ? 3 : 2);
+                skipInterval = siegeMode ? 6 : (criticalMode ? 4 : (emergencyMode ? 3 : 2));
             }
             else
             {
-                skipInterval = criticalMode ? 6 : (emergencyMode ? 4 : 3);
+                skipInterval = siegeMode ? 8 : (criticalMode ? 6 : (emergencyMode ? 4 : 3));
             }
 
             if (skipInterval <= 1) return true;
@@ -101,13 +108,86 @@ public static class MoveEntityHeadedLODPatch
                 return true;
             }
 
-            ProfilerCounterBridge.Increment("MoveEntityHeaded.LODSkipped");
+            ApplyLiteMotion(__instance);
+            ProfilerCounterBridge.Increment("MoveEntityHeaded.LiteMotion");
             return false;
         }
         catch
         {
             return true;
         }
+    }
+
+    /// <summary>
+    /// Lightweight motion extrapolation that skips CharacterController.Move()
+    /// but keeps the entity moving smoothly.  Applies gravity + friction to
+    /// the motion vector and extrapolates position, then syncs the physics
+    /// transform so the next full-physics frame starts from the right spot.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void ApplyLiteMotion(EntityAlive entity)
+    {
+        try
+        {
+            float gravity = entity.world.Gravity;
+
+            // Apply friction/damping to motion — mirrors DefaultMoveEntity
+            if (entity.isSwimming)
+            {
+                entity.motion.x *= 0.91f;
+                entity.motion.z *= 0.91f;
+                // Keep swim buoyancy in motion for next full frame
+                entity.motion.y -= gravity * 0.025f;
+                entity.motion.y *= 0.91f;
+            }
+            else
+            {
+                // Ground friction (0.546f is vanilla's onGround friction)
+                float friction = entity.onGround ? 0.546f : 0.91f;
+                entity.motion.x *= friction;
+                entity.motion.z *= friction;
+
+                if (entity.onGround)
+                {
+                    // On-ground: reset Y motion so gravity doesn't accumulate
+                    // across throttled frames and push the entity below
+                    // floors/terrain — this was causing mass clip-through and
+                    // despawning in multi-story POIs.
+                    entity.motion.y = 0f;
+                }
+                else if (!entity.bInElevator)
+                {
+                    // Airborne: track gravity in motion for the next full frame
+                    entity.motion.y -= gravity;
+                    entity.motion.y *= 0.98f;
+                }
+            }
+
+            // Extrapolate HORIZONTAL position only.
+            // Never modify Y — CharacterController.Move() must handle all
+            // vertical positioning to prevent entities clipping through
+            // thin floors, terrain, or multi-story POI geometry.
+            Vector3 delta = new Vector3(entity.motion.x, 0f, entity.motion.z);
+
+            if (delta.x != 0f || delta.z != 0f)
+            {
+                entity.position += delta;
+
+                // Keep bounding box in sync
+                Bounds bb = entity.boundingBox;
+                bb.center += delta;
+                entity.boundingBox = bb;
+
+                // Sync physics transform so CharacterController starts from
+                // the correct position on the next full-physics frame
+                Transform physT = entity.PhysicsTransform;
+                if (physT != null)
+                {
+                    physT.position = entity.position - Origin.position;
+                }
+            }
+        }
+        catch { }
     }
 
     public static void OnEntityRemoved(int entityId) => s_lastUpdateFrame.Remove(entityId);
