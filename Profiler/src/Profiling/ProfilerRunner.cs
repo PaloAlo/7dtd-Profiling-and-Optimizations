@@ -106,7 +106,8 @@ public class ProfilerRunner : MonoBehaviour
         }
 
         // Apply deep instrumentation patches (deferred to ensure types are loaded)
-        if (profilingEnabled && _dynamicPatchesApplied && !_deepPatchesApplied && Time.frameCount > 100)
+        if (profilingEnabled && _dynamicPatchesApplied && !_deepPatchesApplied && Time.frameCount > 100
+            && ProfilerConfig.Current.EnableDeepEntityInstrumentation)
         {
             try
             {

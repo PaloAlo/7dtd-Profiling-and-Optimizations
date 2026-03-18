@@ -33,6 +33,11 @@ public class ConsoleCmdProfilerConfigReload : ConsoleCmdAbstract
             else
                 SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: Deep physics instrumentation DISABLED.");
 
+            if (cfg.EnableDeepEntityInstrumentation)
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: Deep entity instrumentation ENABLED.");
+            else
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: Deep entity instrumentation DISABLED.");
+
             SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Profiler: Reload complete.");
         }
         catch (Exception ex)

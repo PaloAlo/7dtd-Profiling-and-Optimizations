@@ -21,5 +21,7 @@ static class EntityCleanupPatch
         EAITaskEvaluationThrottlePatch.OnEntityRemoved(_entityId);
         MoveSpeedCachePatch.OnEntityRemoved(_entityId);
         BlockPosUpdateThrottlePatch.OnEntityRemoved(_entityId);
+        DefaultMoveEntityThrottlePatch.OnEntityRemoved(_entityId);
+        EAIManagerUpdateThrottlePatch.OnEntityRemoved(_entityId);
     }
 }

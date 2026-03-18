@@ -18,6 +18,12 @@ public class ProfilerConfig
     /// </summary>
     public bool EnableDeepPhysicsInstrumentation = false;
 
+    /// <summary>
+    /// Enables deep entity instrumentation (patches many Entity/AI sub-methods).
+    /// This is expensive and intended for targeted investigation.
+    /// </summary>
+    public bool EnableDeepEntityInstrumentation = false;
+
     public const string ConfigFileName = "profiler_config.json";
     private const int ConfigVersion = 9;
 
@@ -83,6 +89,7 @@ public class ProfilerConfig
     {
         old.Version = ConfigVersion;
         old.EnableDeepPhysicsInstrumentation = false;
+        old.EnableDeepEntityInstrumentation = false;
         old.EnableProfiling = true;
     }
 }
