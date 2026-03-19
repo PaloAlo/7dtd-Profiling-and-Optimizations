@@ -97,7 +97,6 @@ public static class FrameCache
         MoveSpeedCachePatch.ClearCaches();
         FindPathCachePatch.Clear();
         BlockPosUpdateThrottlePatch.ClearCaches();
-        DefaultMoveEntityThrottlePatch.ClearCaches();
         EAIManagerUpdateThrottlePatch.ClearCaches();
     }
 }

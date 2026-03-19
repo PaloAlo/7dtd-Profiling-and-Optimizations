@@ -32,15 +32,11 @@ public class OptimizationConfig
     // Throttle updateCurrentBlockPosAndValue for distant entities
     public bool EnableBlockPosThrottle = true;
 
-    // Throttle DefaultMoveEntity (CharacterController.Move + entityCollision)
-    // for non-combat mid-range entities under load.  Skips the full physics
-    // step on some frames and applies lightweight gravity/friction instead.
-    public bool EnableDefaultMoveThrottle = true;
-
     // Throttle EAIManager.Update re-evaluation loop for non-combat entities.
     // Already-executing tasks still run every frame; only the expensive
     // CanExecute/isBestTask re-evaluation is throttled.
-    public bool EnableEAIManagerThrottle = true;
+    // DISABLED: caused sleeping zombies to not detect player within 10m.
+    public bool EnableEAIManagerThrottle = false;
 
     // Speed-Curve LOD — reduce movement speed for distant zombies instead of
     // frame-skipping.  All AI and physics still run every frame; distant
@@ -53,7 +49,7 @@ public class OptimizationConfig
     public float SpeedCurveMinMult = 0.35f;        // min speed multiplier (35%)
 
     public const string ConfigFileName = "fps_optimization_config.json";
-    private const int ConfigVersion = 5;
+    private const int ConfigVersion = 6;
     public int Version = ConfigVersion;
 
     public static OptimizationConfig Current { get; private set; } = new OptimizationConfig();
