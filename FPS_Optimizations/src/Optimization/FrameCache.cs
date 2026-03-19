@@ -83,6 +83,12 @@ public static class FrameCache
                 zombieCount++;
         }
         ZombieCount = zombieCount;
+
+        // Classify all entities into budget tiers (once per frame)
+        if (HasPlayer)
+        {
+            EntityBudgetSystem.ClassifyEntities(world, PlayerPosition, zombieCount);
+        }
     }
 
     public static void ClearAllOptimizationCaches()
@@ -98,5 +104,6 @@ public static class FrameCache
         FindPathCachePatch.Clear();
         BlockPosUpdateThrottlePatch.ClearCaches();
         EAIManagerUpdateThrottlePatch.ClearCaches();
+        EntityBudgetSystem.Clear();
     }
 }

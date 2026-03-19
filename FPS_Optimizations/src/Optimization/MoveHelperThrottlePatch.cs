@@ -39,15 +39,15 @@ public static class MoveHelperThrottlePatch
 
         try
         {
-            bool inCombat = ___entity.GetAttackTarget() != null
-                         || ___entity.GetRevengeTarget() != null
-                         || ___entity.hasBeenAttackedTime > 0
-                         || ___entity.isAlert
-                         || ___entity.HasInvestigatePosition;
+            int entityId = ___entity.entityId;
+
+            // Use centralized entity budget classification
+            if (!EntityBudgetSystem.TryGetInfo(entityId, out var budgetInfo))
+                return true;
 
             // Combat-engaged entities always get full obstacle avoidance
-            if (inCombat) return true;
-            int entityId = ___entity.entityId;
+            if (budgetInfo.InCombat) return true;
+
             int currentFrame = Time.frameCount;
             int zombieCount = FrameCache.ZombieCount;
 

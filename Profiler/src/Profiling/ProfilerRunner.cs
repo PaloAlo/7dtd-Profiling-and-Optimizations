@@ -60,6 +60,7 @@ public class ProfilerRunner : MonoBehaviour
 
     private bool _dynamicPatchesApplied = false;
     private bool _deepPatchesApplied = false;
+    private bool _callChainPatchesApplied = false;
 
     public static void Init(Mod modInstance)
     {
@@ -119,6 +120,23 @@ public class ProfilerRunner : MonoBehaviour
             {
                 LogUtil.Warn($"ProfilerRunner: DeepEntityInstrumentation failed: {ex.Message}");
                 _deepPatchesApplied = true;
+            }
+        }
+
+        // Apply call-chain instrumentation (lightweight, enabled by default)
+        if (profilingEnabled && _dynamicPatchesApplied && !_callChainPatchesApplied && Time.frameCount > 50
+            && ProfilerConfig.Current.EnableCallChainInstrumentation)
+        {
+            try
+            {
+                var harmony = new Harmony(GetType().ToString() + ".CallChain");
+                CallChainInstrumentation.Apply(harmony);
+                _callChainPatchesApplied = true;
+            }
+            catch (Exception ex)
+            {
+                LogUtil.Warn($"ProfilerRunner: CallChainInstrumentation failed: {ex.Message}");
+                _callChainPatchesApplied = true;
             }
         }
 
@@ -315,6 +333,27 @@ public class ProfilerRunner : MonoBehaviour
             WriteEffectiveness(sb, counters, "PlayerShelter", "PlayerShelter.Throttled", "PlayerShelter.Throttled");
             WriteEffectiveness(sb, counters, "ZombieFrame", "ZombieFrame.Skipped", "ZombieFrame.Skipped");
             WriteEffectiveness(sb, counters, "MoveSpeed", "MoveSpeed.CacheHit", "MoveSpeed.CacheHit");
+
+            // --- CALL CHAIN DATA ---
+            var callChainCounters = new List<KeyValuePair<string, long>>();
+            foreach (var kv in counters)
+            {
+                if (kv.Key.StartsWith("CallChain.", StringComparison.Ordinal) && kv.Value > 0)
+                    callChainCounters.Add(kv);
+            }
+            if (callChainCounters.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("=== CALL CHAIN: WHO CALLS GetAttackTarget / GetRevengeTarget ===");
+                sb.AppendLine("# Format: CallChain.<TargetMethod>.from.<CallerMethod>,Count");
+                sb.AppendLine("# 'Direct/Unknown' = called from a site we don't instrument");
+                sb.AppendLine("Caller,Calls");
+                callChainCounters.Sort((a, b) => b.Value.CompareTo(a.Value));
+                foreach (var kv in callChainCounters)
+                {
+                    sb.AppendLine($"{kv.Key},{kv.Value}");
+                }
+            }
 
             // --- GAME CPU COST PER ZOMBIE ---
             sb.AppendLine();

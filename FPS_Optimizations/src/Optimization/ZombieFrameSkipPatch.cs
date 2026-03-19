@@ -39,23 +39,20 @@ public static class ZombieFrameSkipPatch
 
             if (__instance.IsSleeping) return true;
 
-            float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
-            if (distSq < ALWAYS_UPDATE_DIST_SQ) return true;
+            // Use centralized entity budget classification
+            int entityId = __instance.entityId;
+            if (!EntityBudgetSystem.TryGetInfo(entityId, out var budgetInfo))
+                return true;
+
+            // Only skip Low tier (> 80m, non-combat) — matches original ALWAYS_UPDATE_DIST_SQ
+            if (budgetInfo.Tier != EntityBudgetSystem.Tier.Low) return true;
 
             bool criticalMode = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
+            int skipInterval = criticalMode ? 4 : 3;
 
-            int skipInterval;
-            if (distSq < FAR_DIST_SQ)
-                skipInterval = 3;
-            else
-                skipInterval = criticalMode ? 4 : 3;
-
-            int frameSlot = Time.frameCount % skipInterval;
-            int entitySlot = (__instance.entityId & 0x7FFFFFFF) % skipInterval;
-
-            if (frameSlot == entitySlot)
+            if (EntityBudgetSystem.ShouldRunThisFrame(entityId, skipInterval))
             {
-                s_lastUpdateFrame[__instance.entityId] = Time.frameCount;
+                s_lastUpdateFrame[entityId] = Time.frameCount;
                 return true;
             }
 

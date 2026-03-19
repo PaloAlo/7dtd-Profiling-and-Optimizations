@@ -33,35 +33,18 @@ public static class SpeedStrafeThrottlePatch
             int zombieCount = FrameCache.ZombieCount;
             if (zombieCount < AdaptiveThresholds.EmergencyZombieThreshold) return true;
 
-            float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
-            if (distSq < ALWAYS_RUN_DIST_SQ) return true;
+            // Use centralized entity budget classification
+            int entityId = __instance.entityId;
+            if (!EntityBudgetSystem.TryGetInfo(entityId, out var budgetInfo))
+                return true;
 
-            bool inCombat = __instance.GetAttackTarget() != null
-                         || __instance.GetRevengeTarget() != null
-                         || __instance.hasBeenAttackedTime > 0
-                         || __instance.isAlert
-                         || __instance.HasInvestigatePosition;
+            // Critical tier = close or combat → always full update
+            if (budgetInfo.Tier == EntityBudgetSystem.Tier.Critical) return true;
 
-            // Combat-engaged entities always get fresh heading calculation
-            if (inCombat) return true;
-
-            bool criticalMode = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
-
-            int skipInterval;
-            if (distSq < MID_DIST_SQ)
-                skipInterval = criticalMode ? 2 : 1;
-            else if (distSq < FAR_DIST_SQ)
-                skipInterval = criticalMode ? 3 : 2;
-            else
-                skipInterval = criticalMode ? 4 : 3;
-
+            int skipInterval = EntityBudgetSystem.GetRecommendedInterval(budgetInfo.Tier, zombieCount);
             if (skipInterval <= 1) return true;
 
-            int entityId = __instance.entityId;
-            int frameSlot = Time.frameCount % skipInterval;
-            int entitySlot = (entityId & 0x7FFFFFFF) % skipInterval;
-
-            if (frameSlot == entitySlot)
+            if (EntityBudgetSystem.ShouldRunThisFrame(entityId, skipInterval))
             {
                 s_lastFrame[entityId] = Time.frameCount;
                 return true;

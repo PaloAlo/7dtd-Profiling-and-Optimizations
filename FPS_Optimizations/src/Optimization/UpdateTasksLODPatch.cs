@@ -47,46 +47,23 @@ public static class UpdateTasksLODPatch
             if (__instance.IsSleeping) return true;
 
             int entityId = __instance.entityId;
-            int currentFrame = Time.frameCount;
             int zombieCount = FrameCache.ZombieCount;
 
-            bool emergencyMode = zombieCount >= AdaptiveThresholds.EmergencyZombieThreshold;
-            bool criticalMode = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
+            // Use centralized entity budget classification
+            if (!EntityBudgetSystem.TryGetInfo(entityId, out var budgetInfo))
+                return true;
 
-            float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
+            // Critical tier = close or combat → always full updateTasks
+            if (budgetInfo.Tier == EntityBudgetSystem.Tier.Critical) return true;
 
-            bool inCombat = __instance.GetAttackTarget() != null
-                         || __instance.GetRevengeTarget() != null
-                         || __instance.hasBeenAttackedTime > 0
-                         || __instance.isAlert
-                         || __instance.HasInvestigatePosition;
+            // High tier only throttles under extreme load
+            if (budgetInfo.Tier == EntityBudgetSystem.Tier.High && zombieCount < 100) return true;
 
-            // ── Distance-based LOD (non-combat, outside close range) ──
-            if (inCombat) return true;
-            if (distSq < CLOSE_DIST_SQ) return true;
-
-            bool siegeMode = zombieCount >= 100;
-
-            int interval;
-            if (distSq < MID_DIST_SQ)
-            {
-                interval = emergencyMode ? 2 : 1;
-            }
-            else if (distSq < FAR_DIST_SQ)
-            {
-                interval = siegeMode ? 4 : (criticalMode ? 3 : (emergencyMode ? 2 : 1));
-            }
-            else if (distSq < VERY_FAR_DIST_SQ)
-            {
-                interval = siegeMode ? 6 : (criticalMode ? 4 : (emergencyMode ? 3 : 2));
-            }
-            else
-            {
-                interval = siegeMode ? 8 : (criticalMode ? 6 : (emergencyMode ? 4 : 3));
-            }
-
+            // Use budget system's recommended interval
+            int interval = EntityBudgetSystem.GetRecommendedInterval(budgetInfo.Tier, zombieCount);
             if (interval <= 1) return true;
 
+            int currentFrame = Time.frameCount;
             if (!s_lastFullUpdateFrame.TryGetValue(entityId, out int lastFrame2))
             {
                 s_lastFullUpdateFrame[entityId] = currentFrame;

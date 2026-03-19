@@ -24,8 +24,15 @@ public class ProfilerConfig
     /// </summary>
     public bool EnableDeepEntityInstrumentation = false;
 
+    /// <summary>
+    /// Enables call-chain instrumentation for GetAttackTarget / GetRevengeTarget.
+    /// Tracks which caller methods generate the most target query calls.
+    /// Lightweight (thread-local tag, no stack walks). Results appear in high-load CSVs.
+    /// </summary>
+    public bool EnableCallChainInstrumentation = true;
+
     public const string ConfigFileName = "profiler_config.json";
-    private const int ConfigVersion = 9;
+    private const int ConfigVersion = 10;
 
     public int Version = ConfigVersion;
 
@@ -90,6 +97,7 @@ public class ProfilerConfig
         old.Version = ConfigVersion;
         old.EnableDeepPhysicsInstrumentation = false;
         old.EnableDeepEntityInstrumentation = false;
+        old.EnableCallChainInstrumentation = true;
         old.EnableProfiling = true;
     }
 }

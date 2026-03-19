@@ -34,35 +34,19 @@ public static class EntityCollisionThrottlePatch
             if (FrameCache.ZombieCount < AdaptiveThresholds.EmergencyZombieThreshold)
                 return true;
 
-            float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
-            if (distSq < CLOSE_DIST_SQ) return true;
+            // Use centralized entity budget classification
+            int entityId = __instance.entityId;
+            if (!EntityBudgetSystem.TryGetInfo(entityId, out var budgetInfo))
+                return true;
 
-            bool inCombat = alive.GetAttackTarget() != null
-                         || alive.GetRevengeTarget() != null
-                         || alive.hasBeenAttackedTime > 0
-                         || alive.isAlert
-                         || alive.HasInvestigatePosition;
+            // Critical tier = close or combat → always full collision
+            if (budgetInfo.Tier == EntityBudgetSystem.Tier.Critical) return true;
 
-            // Combat-engaged entities always get full collision
-            if (inCombat) return true;
-
-            bool criticalMode = FrameCache.ZombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
-
-            int skipInterval;
-            if (distSq < MID_DIST_SQ)
-                skipInterval = criticalMode ? 2 : 1;
-            else if (distSq < FAR_DIST_SQ)
-                skipInterval = criticalMode ? 2 : 1;
-            else
-                skipInterval = criticalMode ? 3 : 2;
-
+            int zombieCount = FrameCache.ZombieCount;
+            int skipInterval = EntityBudgetSystem.GetRecommendedInterval(budgetInfo.Tier, zombieCount);
             if (skipInterval <= 1) return true;
 
-            int entityId = __instance.entityId;
-            int frameSlot = Time.frameCount % skipInterval;
-            int entitySlot = (entityId & 0x7FFFFFFF) % skipInterval;
-
-            if (frameSlot == entitySlot)
+            if (EntityBudgetSystem.ShouldRunThisFrame(entityId, skipInterval))
             {
                 s_lastCollisionFrame[entityId] = Time.frameCount;
                 return true;

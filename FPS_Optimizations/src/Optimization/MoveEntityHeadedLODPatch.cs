@@ -46,20 +46,12 @@ public static class MoveEntityHeadedLODPatch
 
             int entityId = __instance.entityId;
             int zombieCount = FrameCache.ZombieCount;
-            bool emergencyMode = zombieCount >= AdaptiveThresholds.EmergencyZombieThreshold;
-            bool criticalMode = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
 
-            float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
+            // Use centralized entity budget classification
+            if (!EntityBudgetSystem.TryGetInfo(entityId, out var budgetInfo))
+                return true;
 
-            float tier1Sq = OptimizationConfig.Current.MoveLODTier1DistSq;
-            float tier2Sq = OptimizationConfig.Current.MoveLODTier2DistSq;
-            float tier3Sq = OptimizationConfig.Current.MoveLODTier3DistSq;
-
-            bool inCombat = __instance.GetAttackTarget() != null
-                         || __instance.GetRevengeTarget() != null
-                         || __instance.hasBeenAttackedTime > 0
-                         || __instance.isAlert
-                         || __instance.HasInvestigatePosition;
+            float distSq = budgetInfo.DistanceSq;
 
             // ── Speed-Curve LOD ───────────────────────────────────────
             // Reduce movement speed based on distance instead of skipping
@@ -76,33 +68,15 @@ public static class MoveEntityHeadedLODPatch
                 ProfilerCounterBridge.Increment("MoveSpeed.Curved");
             }
 
-            // ── Distance-based LOD (non-combat, outside tier1) ──
-            if (distSq < tier1Sq) return true;
-            if (inCombat) return true;
+            // ── Distance-based LOD (non-combat, outside close range) ──
+            // Critical tier = close or combat → always full update
+            if (budgetInfo.Tier == EntityBudgetSystem.Tier.Critical) return true;
 
-            // Scale distance LOD intervals — at extreme counts, even mid-range
-            // entities get more aggressive throttling.
-            bool siegeMode = zombieCount >= 100;
-            int skipInterval;
-            if (distSq < tier2Sq)
-            {
-                skipInterval = siegeMode ? 4 : (criticalMode ? 3 : (emergencyMode ? 2 : 1));
-            }
-            else if (distSq < tier3Sq)
-            {
-                skipInterval = siegeMode ? 6 : (criticalMode ? 4 : (emergencyMode ? 3 : 2));
-            }
-            else
-            {
-                skipInterval = siegeMode ? 8 : (criticalMode ? 6 : (emergencyMode ? 4 : 3));
-            }
-
+            // Use budget system's recommended interval for this tier
+            int skipInterval = EntityBudgetSystem.GetRecommendedInterval(budgetInfo.Tier, zombieCount);
             if (skipInterval <= 1) return true;
 
-            int frameSlot2 = Time.frameCount % skipInterval;
-            int entitySlot2 = (entityId & 0x7FFFFFFF) % skipInterval;
-
-            if (frameSlot2 == entitySlot2)
+            if (EntityBudgetSystem.ShouldRunThisFrame(entityId, skipInterval))
             {
                 s_lastUpdateFrame[entityId] = Time.frameCount;
                 return true;
