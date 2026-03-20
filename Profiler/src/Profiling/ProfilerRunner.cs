@@ -322,8 +322,8 @@ public class ProfilerRunner : MonoBehaviour
 
             WriteEffectiveness(sb, counters, "MoveEntityHeaded.Lite", "MoveEntityHeaded.LiteMotion", "MoveEntityHeaded.calls");
             WriteEffectiveness(sb, counters, "updateTasks.Lite", "updateTasks.LiteRun", "updateTasks.calls");
-            WriteEffectiveness(sb, counters, "GetAttackTarget", "GetAttackTarget.CacheHit", "EntityAlive.GetAttackTarget.calls");
-            WriteEffectiveness(sb, counters, "GetRevengeTarget", "GetRevengeTarget.CacheHit", "EntityAlive.GetRevengeTarget.calls");
+            WriteEffectiveness(sb, counters, "GetAttackTarget", "GetAttackTarget.CacheHit", "GetAttackTarget.Total");
+            WriteEffectiveness(sb, counters, "GetRevengeTarget", "GetRevengeTarget.CacheHit", "GetRevengeTarget.Total");
             WriteEffectiveness(sb, counters, "EntityCollision", "EntityCollision.Skipped", "EntityCollision.Skipped");
             WriteEffectiveness(sb, counters, "MoveHelper", "MoveHelper.Throttled", "MoveHelper.Throttled");
             WriteEffectiveness(sb, counters, "SpeedStrafe", "SpeedStrafe.Throttled", "SpeedStrafe.Throttled");

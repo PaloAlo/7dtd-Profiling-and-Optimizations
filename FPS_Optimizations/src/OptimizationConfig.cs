@@ -44,12 +44,12 @@ public class OptimizationConfig
     // AI state machines, navigation, or CharacterController physics.
     public bool EnableSpeedCurveLOD = true;
     public int SpeedCurveZombieThreshold = 30;     // min zombies to activate
-    public float SpeedCurveCloseDistSq = 225f;     // 15m — full speed below
-    public float SpeedCurveFarDistSq = 6400f;      // 80m — min speed at/beyond
+    public float SpeedCurveCloseDistSq = 400f;     // 20m — aligned with budget system CLOSE_DIST_SQ
+    public float SpeedCurveFarDistSq = 6400f;      // 80m — aligned with budget system FAR_DIST_SQ
     public float SpeedCurveMinMult = 0.35f;        // min speed multiplier (35%)
 
     public const string ConfigFileName = "fps_optimization_config.json";
-    private const int ConfigVersion = 6;
+    private const int ConfigVersion = 7;
     public int Version = ConfigVersion;
 
     public static OptimizationConfig Current { get; private set; } = new OptimizationConfig();

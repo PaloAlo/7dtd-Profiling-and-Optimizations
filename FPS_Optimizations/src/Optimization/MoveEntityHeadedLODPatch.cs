@@ -8,13 +8,12 @@
 // Distant zombies move slower, creating natural stagger without any
 // frame-skipping for combat-aware entities.
 //
-// - Close range (< 15m):  full speed, full update every frame
-// - Mid range (15–80m):   speed scales from 100% down to 35%
-// - Far non-combat:       distance LOD with lite motion (unchanged)
+// - Critical (< 20m or combat):  full speed, full update every frame
+// - Non-critical (20–80m):       speed scales from 100% down to 35%
+// - Far non-combat:              distance LOD with lite motion (unchanged)
 //
-// All AI and physics still run every frame for combat entities.
-// CharacterController.Move() still runs, just with a smaller direction
-// vector, keeping entity behavior smooth and correct.
+// Speed curve thresholds are aligned with EntityBudgetSystem so both
+// systems share a single distance classification.
 
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -55,14 +54,15 @@ public static class MoveEntityHeadedLODPatch
 
             // ── Speed-Curve LOD ───────────────────────────────────────
             // Reduce movement speed based on distance instead of skipping
-            // frames.  All AI/physics still runs every frame — distant
-            // zombies just move slower, creating a natural wave effect.
+            // frames.  Uses budget system tiers for consistent thresholds.
+            // Critical tier (close + combat) gets full speed; others get
+            // distance-based reduction using the same distance ranges.
             var cfg = OptimizationConfig.Current;
             if (cfg.EnableSpeedCurveLOD
                 && zombieCount >= cfg.SpeedCurveZombieThreshold
-                && distSq > cfg.SpeedCurveCloseDistSq)
+                && budgetInfo.Tier != EntityBudgetSystem.Tier.Critical)
             {
-                float t = Mathf.InverseLerp(cfg.SpeedCurveCloseDistSq, cfg.SpeedCurveFarDistSq, distSq);
+                float t = Mathf.InverseLerp(EntityBudgetSystem.CLOSE_DIST_SQ, EntityBudgetSystem.FAR_DIST_SQ, distSq);
                 float speedMult = Mathf.Lerp(1f, cfg.SpeedCurveMinMult, t);
                 _direction *= speedMult;
                 ProfilerCounterBridge.Increment("MoveSpeed.Curved");

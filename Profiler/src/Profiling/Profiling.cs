@@ -298,7 +298,6 @@ public static class ProfilingUtils
                     {
                         harmony.Patch(m, prefixInfo, postfixInfo);
                         patchedCountForTarget++;
-                        LogUtil.Debug($"Profiling: patched {m.DeclaringType?.FullName}.{m.Name}");
                         continue;
                     }
 
@@ -309,7 +308,6 @@ public static class ProfilingUtils
                         {
                             harmony.Patch(baseDef, prefixInfo, postfixInfo);
                             patchedCountForTarget++;
-                            LogUtil.Debug($"patched base {baseDef.DeclaringType?.FullName}.{baseDef.Name}");
                             continue;
                         }
                         catch { }

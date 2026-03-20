@@ -74,7 +74,7 @@ public static class CallChainInstrumentation
             .FirstOrDefault(a => string.Equals(a.GetName().Name, "Assembly-CSharp", StringComparison.OrdinalIgnoreCase));
         if (asm == null)
         {
-            LogUtil.Warn("[CallChain] Assembly-CSharp not found.");
+            LogUtil.Warn("Assembly-CSharp not found.");
             return;
         }
 
@@ -137,19 +137,28 @@ public static class CallChainInstrumentation
                 }
                 if (type == null) continue;
 
-                var method = type.GetMethod(methodName,
-                    BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                MethodInfo method = null;
+                try
+                {
+                    method = type.GetMethod(methodName,
+                        BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                }
+                catch (AmbiguousMatchException)
+                {
+                    method = type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                        .FirstOrDefault(m => m.Name == methodName && !m.IsAbstract);
+                }
                 if (method == null || method.IsAbstract) continue;
 
-                // Store the tag keyed by method so the prefix/postfix can look it up
-                _methodTags[method] = tag;
+                // Store the tag keyed by "TypeName.MethodName" for reliable lookup
+                _methodTags[$"{type.Name}.{method.Name}"] = tag;
                 harmony.Patch(method, prefix, postfix);
                 patchCount++;
-                LogUtil.Debug($"[CallChain] Patched caller: {typeName}.{methodName} -> \"{tag}\"");
+                LogUtil.Debug($"Patched caller: {typeName}.{methodName} -> \"{tag}\"");
             }
             catch (Exception ex)
             {
-                LogUtil.Debug($"[CallChain] Failed to patch {typeName}.{methodName}: {ex.Message}");
+                LogUtil.Debug($"Failed to patch {typeName}.{methodName}: {ex.Message}");
             }
         }
 
@@ -157,7 +166,7 @@ public static class CallChainInstrumentation
         PatchTargetMethods(harmony, asm);
 
         _applied = true;
-        LogUtil.Info($"[CallChain] Applied {patchCount} caller-site patches + target interceptors.");
+        LogUtil.Info($"Applied {patchCount} caller-site patches + target interceptors.");
     }
 
     private static void PatchTargetMethods(Harmony harmony, Assembly asm)
@@ -175,11 +184,11 @@ public static class CallChainInstrumentation
             try
             {
                 harmony.Patch(getAttack, targetPrefix);
-                LogUtil.Debug("[CallChain] Intercepting GetAttackTarget");
+                LogUtil.Debug("Intercepting GetAttackTarget");
             }
             catch (Exception ex)
             {
-                LogUtil.Debug($"[CallChain] Failed to intercept GetAttackTarget: {ex.Message}");
+                LogUtil.Debug($"Failed to intercept GetAttackTarget: {ex.Message}");
             }
         }
 
@@ -191,17 +200,17 @@ public static class CallChainInstrumentation
             try
             {
                 harmony.Patch(getRevenge, targetPrefix);
-                LogUtil.Debug("[CallChain] Intercepting GetRevengeTarget");
+                LogUtil.Debug("Intercepting GetRevengeTarget");
             }
             catch (Exception ex)
             {
-                LogUtil.Debug($"[CallChain] Failed to intercept GetRevengeTarget: {ex.Message}");
+                LogUtil.Debug($"Failed to intercept GetRevengeTarget: {ex.Message}");
             }
         }
     }
 
-    // --- Method tag storage ---
-    private static readonly Dictionary<MethodBase, string> _methodTags = new Dictionary<MethodBase, string>();
+    // --- Method tag storage (string keys for reliable cross-assembly lookup) ---
+    private static readonly Dictionary<string, string> _methodTags = new Dictionary<string, string>();
 
     // --- Caller site prefix/postfix ---
     // These wrap every known caller to set the thread-local tag.
@@ -212,7 +221,8 @@ public static class CallChainInstrumentation
         if (!ProfilerConfig.Current.EnableCallChainInstrumentation) return;
         try
         {
-            if (_methodTags.TryGetValue(__originalMethod, out var tag))
+            string key = $"{__originalMethod.DeclaringType?.Name}.{__originalMethod.Name}";
+            if (_methodTags.TryGetValue(key, out var tag))
             {
                 __state = PushCaller(tag);
             }

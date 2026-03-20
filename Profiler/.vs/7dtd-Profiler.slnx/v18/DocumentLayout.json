@@ -3,6 +3,14 @@
   "WorkspaceRootPath": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{15A62354-3EA6-C78F-6C53-FEC1272F0862}|Profiler.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\profiler\\src\\patches\\callchaininstrumentation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{15A62354-3EA6-C78F-6C53-FEC1272F0862}|Profiler.csproj|solutionrelative:src\\patches\\callchaininstrumentation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{15A62354-3EA6-C78F-6C53-FEC1272F0862}|Profiler.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\profiler\\src\\profiling\\profiling.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{15A62354-3EA6-C78F-6C53-FEC1272F0862}|Profiler.csproj|solutionrelative:src\\profiling\\profiling.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{15A62354-3EA6-C78F-6C53-FEC1272F0862}|Profiler.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\profiler\\src\\profiling\\profilerrunner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{15A62354-3EA6-C78F-6C53-FEC1272F0862}|Profiler.csproj|solutionrelative:src\\profiling\\profilerrunner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -15,8 +23,8 @@
       "RelativeMoniker": "D:0:0:{15A62354-3EA6-C78F-6C53-FEC1272F0862}|Profiler.csproj|solutionrelative:src\\console\\consolecmdprofilerconfigreload.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\.github\\copilot-instructions.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:.github\\copilot-instructions.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}"
+      "AbsoluteMoniker": "D:0:0:{15A62354-3EA6-C78F-6C53-FEC1272F0862}|Profiler.csproj|e:\\github\\7dtd\\my mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\profiler\\src\\logutil.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{15A62354-3EA6-C78F-6C53-FEC1272F0862}|Profiler.csproj|solutionrelative:src\\logutil.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -26,7 +34,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 4,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Bookmark",
@@ -34,20 +42,45 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
-              "Title": "copilot-instructions.md",
-              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\.github\\copilot-instructions.md",
-              "RelativeDocumentMoniker": ".github\\copilot-instructions.md",
-              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\.github\\copilot-instructions.md",
-              "RelativeToolTip": ".github\\copilot-instructions.md",
-              "ViewState": "AgIAAAYAAAAAAAAAAABOwAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
-              "WhenOpened": "2026-03-18T18:53:40.757Z",
+              "DocumentIndex": 0,
+              "Title": "CallChainInstrumentation.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\src\\Patches\\CallChainInstrumentation.cs",
+              "RelativeDocumentMoniker": "src\\Patches\\CallChainInstrumentation.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\src\\Patches\\CallChainInstrumentation.cs",
+              "RelativeToolTip": "src\\Patches\\CallChainInstrumentation.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAJwAAAAgAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-19T18:29:35.127Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 5,
+              "Title": "LogUtil.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\src\\LogUtil.cs",
+              "RelativeDocumentMoniker": "src\\LogUtil.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\src\\LogUtil.cs",
+              "RelativeToolTip": "src\\LogUtil.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-19T18:05:22.682Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Profiling.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\src\\Profiling\\Profiling.cs",
+              "RelativeDocumentMoniker": "src\\Profiling\\Profiling.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\src\\Profiling\\Profiling.cs",
+              "RelativeToolTip": "src\\Profiling\\Profiling.cs",
+              "ViewState": "AgIAAB8BAAAAAAAAAAAMwC0BAAAVAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-19T18:01:05.599Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
               "Title": "ConsoleCmdProfilerConfigReload.cs",
               "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\src\\Console\\ConsoleCmdProfilerConfigReload.cs",
               "RelativeDocumentMoniker": "src\\Console\\ConsoleCmdProfilerConfigReload.cs",
@@ -55,12 +88,11 @@
               "RelativeToolTip": "src\\Console\\ConsoleCmdProfilerConfigReload.cs",
               "ViewState": "AgIAACUAAAAAAAAAAABOwAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-03-18T18:45:56.14Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-03-18T18:45:56.14Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 3,
               "Title": "ProfilerConfig.cs",
               "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\src\\Profiling\\ProfilerConfig.cs",
               "RelativeDocumentMoniker": "src\\Profiling\\ProfilerConfig.cs",
@@ -68,12 +100,11 @@
               "RelativeToolTip": "src\\Profiling\\ProfilerConfig.cs",
               "ViewState": "AgIAABYAAAAAAAAAAABUwAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-03-18T18:45:38.298Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-03-18T18:45:38.298Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 2,
               "Title": "ProfilerRunner.cs",
               "DocumentMoniker": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\src\\Profiling\\ProfilerRunner.cs",
               "RelativeDocumentMoniker": "src\\Profiling\\ProfilerRunner.cs",
@@ -81,8 +112,7 @@
               "RelativeToolTip": "src\\Profiling\\ProfilerRunner.cs",
               "ViewState": "AgIAAF4AAAAAAAAAAAAAwAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-03-18T18:44:19.658Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-03-18T18:44:19.658Z"
             }
           ]
         }

@@ -1,0 +1,102 @@
+﻿// ProfilerConfig.cs
+
+using System;
+using System.IO;
+using System.Reflection;
+using Newtonsoft.Json;
+
+[Serializable]
+public class ProfilerConfig
+{
+    /// <summary>
+    /// When false, ALL profiling instrumentation is disabled.
+    /// </summary>
+    public bool EnableProfiling = true;
+
+    /// <summary>
+    /// Enables deep physics instrumentation (adds overhead, use for targeted profiling only).
+    /// </summary>
+    public bool EnableDeepPhysicsInstrumentation = false;
+
+    /// <summary>
+    /// Enables deep entity instrumentation (patches many Entity/AI sub-methods).
+    /// This is expensive and intended for targeted investigation.
+    /// </summary>
+    public bool EnableDeepEntityInstrumentation = false;
+
+    /// <summary>
+    /// Enables call-chain instrumentation for GetAttackTarget / GetRevengeTarget.
+    /// Tracks which caller methods generate the most target query calls.
+    /// Lightweight (thread-local tag, no stack walks). Results appear in high-load CSVs.
+    /// </summary>
+    public bool EnableCallChainInstrumentation = true;
+
+    public const string ConfigFileName = "profiler_config.json";
+    private const int ConfigVersion = 10;
+
+    public int Version = ConfigVersion;
+
+    public static ProfilerConfig Current { get; private set; } = new ProfilerConfig();
+
+    public static void Load(string folder = null)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(folder))
+            {
+                folder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            }
+            string path = Path.Combine(folder, ConfigFileName);
+
+            if (File.Exists(path))
+            {
+                string json = File.ReadAllText(path);
+                var loaded = JsonConvert.DeserializeObject<ProfilerConfig>(json);
+                if (loaded != null)
+                {
+                    if (loaded.Version < ConfigVersion)
+                    {
+                        MigrateConfig(loaded);
+                        Save(folder);
+                    }
+                    Current = loaded;
+                    return;
+                }
+            }
+
+            Current = new ProfilerConfig();
+            Save(folder);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"Failed to load ProfilerConfig: {ex.Message}");
+            Current = new ProfilerConfig();
+        }
+    }
+
+    public static void Save(string folder = null)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(folder))
+            {
+                folder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            }
+            string path = Path.Combine(folder, ConfigFileName);
+            string json = JsonConvert.SerializeObject(Current, Formatting.Indented);
+            File.WriteAllText(path, json);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"Failed to save ProfilerConfig: {ex.Message}");
+        }
+    }
+
+    private static void MigrateConfig(ProfilerConfig old)
+    {
+        old.Version = ConfigVersion;
+        old.EnableDeepPhysicsInstrumentation = false;
+        old.EnableDeepEntityInstrumentation = false;
+        old.EnableProfiling = true;
+    }
+}

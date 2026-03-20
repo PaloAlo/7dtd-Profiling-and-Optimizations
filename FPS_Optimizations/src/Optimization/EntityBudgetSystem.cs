@@ -54,10 +54,22 @@ public static class EntityBudgetSystem
     public static int MediumCount { get; private set; }
     public static int LowCount { get; private set; }
 
-    // Distance thresholds (squared)
-    private const float CLOSE_DIST_SQ = 400f;      // 20m — always critical
-    private const float MID_DIST_SQ = 2500f;        // 50m
-    private const float FAR_DIST_SQ = 6400f;        // 80m
+    // Distance thresholds (squared) — public for speed curve alignment
+    public const float CLOSE_DIST_SQ = 400f;        // 20m — always critical
+    public const float MID_DIST_SQ = 2500f;          // 50m
+    public const float FAR_DIST_SQ = 6400f;           // 80m
+
+    // Surge detection — stagger mass sleeper awakenings across frames
+    private static int s_previousClassifiedCount;
+    private static int s_surgeEndFrame = -1;
+    private const int SURGE_THRESHOLD = 15;
+    private const int SURGE_DURATION_FRAMES = 30;
+
+    /// <summary>
+    /// True when a large number of entities appeared recently (mass sleeper awakening).
+    /// Proximity-only Critical entities are reclassified to High tier during surge.
+    /// </summary>
+    public static bool IsSurge => Time.frameCount < s_surgeEndFrame;
 
     /// <summary>
     /// Classify all entities. Called once per frame from FrameCache.Refresh().
@@ -94,8 +106,18 @@ public static class EntityBudgetSystem
             Tier tier;
             if (distSq < CLOSE_DIST_SQ || inCombat)
             {
-                tier = Tier.Critical;
-                CriticalCount++;
+                if (IsSurge && !inCombat)
+                {
+                    // Surge: proximity-only entities demoted to High to stagger
+                    // mass sleeper awakening processing across frames
+                    tier = Tier.High;
+                    HighCount++;
+                }
+                else
+                {
+                    tier = Tier.Critical;
+                    CriticalCount++;
+                }
             }
             else if (distSq < MID_DIST_SQ)
             {
@@ -125,6 +147,15 @@ public static class EntityBudgetSystem
                 FrameSlot = frameSlot
             };
         }
+
+        // Detect surge: mass sleeper awakening stagger
+        int totalClassified = CriticalCount + HighCount + MediumCount + LowCount;
+        if (totalClassified - s_previousClassifiedCount >= SURGE_THRESHOLD)
+        {
+            s_surgeEndFrame = frameCount + SURGE_DURATION_FRAMES;
+            ProfilerCounterBridge.Increment("Budget.SurgeDetected");
+        }
+        s_previousClassifiedCount = totalClassified;
 
         // Report tier distribution to profiler
         ProfilerCounterBridge.Increment("Budget.Critical", CriticalCount);
@@ -182,6 +213,7 @@ public static class EntityBudgetSystem
         bool emergency = zombieCount >= AdaptiveThresholds.EmergencyZombieThreshold;
         bool critical = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
         bool siege = zombieCount >= 100;
+        bool surge = IsSurge;
 
         switch (tier)
         {
@@ -189,18 +221,25 @@ public static class EntityBudgetSystem
                 return 1; // ALWAYS every frame
 
             case Tier.High:
-                // Only throttle under extreme load
+                // During surge, more aggressive to stagger mass awakening
+                if (surge && siege) return 3;
                 if (siege) return 2;
+                if (surge) return 2;
                 return 1;
 
             case Tier.Medium:
+                if (surge && siege) return 6;
                 if (siege) return 4;
+                if (surge && critical) return 4;
                 if (critical) return 3;
+                if (surge) return 3;
                 if (emergency) return 2;
                 return 1;
 
             case Tier.Low:
+                if (surge && siege) return 12;
                 if (siege) return 8;
+                if (surge) return 8;
                 if (critical) return 6;
                 if (emergency) return 4;
                 return 3;
@@ -245,5 +284,7 @@ public static class EntityBudgetSystem
         HighCount = 0;
         MediumCount = 0;
         LowCount = 0;
+        s_previousClassifiedCount = 0;
+        s_surgeEndFrame = -1;
     }
 }

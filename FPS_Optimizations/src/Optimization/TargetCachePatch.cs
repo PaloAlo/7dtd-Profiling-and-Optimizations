@@ -20,6 +20,8 @@ static class GetAttackTargetCachePatch
         if (!OptimizationConfig.Current.EnableTargetCache) return true;
         if (FrameCache.ShouldBypassThrottling) return true;
 
+        ProfilerCounterBridge.Increment("GetAttackTarget.Total");
+
         int frame = Time.frameCount;
         int id = __instance.entityId;
 
@@ -52,6 +54,8 @@ static class GetRevengeTargetCachePatch
     {
         if (!OptimizationConfig.Current.EnableTargetCache) return true;
         if (FrameCache.ShouldBypassThrottling) return true;
+
+        ProfilerCounterBridge.Increment("GetRevengeTarget.Total");
 
         int frame = Time.frameCount;
         int id = __instance.entityId;
