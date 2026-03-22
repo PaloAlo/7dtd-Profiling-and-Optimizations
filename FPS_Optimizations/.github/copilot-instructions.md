@@ -1,0 +1,12 @@
+# Copilot Instructions
+
+## General Guidelines
+- NEVER ADD PREFIXES TO LOGGING
+- Avoid copying other modders' code; when using their ideas, implement independently.
+- Provide concise progress updates; avoid stalling mid-sentence. Continue tasks, report build results, and resume work until requested to stop.
+
+## Project Guidelines
+- Optimization mod (FPS Optimizations) reports runtime counters into the Profiler via reflection into `ProfilingUtils.PerFrameCounters`; keep `PerFrameCounters` API stable and preserve reflection bridge compatibility.
+- Old profiling snapshots are stored on the Desktop in two folders:
+  - Profiling log files with optimizations
+  - Profiling log files just vanilla

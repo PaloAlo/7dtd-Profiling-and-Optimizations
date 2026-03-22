@@ -1,0 +1,71 @@
+# HIGH-LOAD CAPTURE: RECOVERY_FAIL
+# Timestamp: 2026-03-17T18:22:35.5713382Z
+# Frame: 71764
+# ZombieCount: 0
+# CurrentFPS: 101.75
+# BaselineFPS: 129.64
+# PeakFPS: 173.78
+# FPSDrop%: 21.5%
+# PeakZombies: 0
+# CaptureNumber: 1/5
+# GC_MB: 3995.7
+
+=== TIMING DATA (sorted by TotalMs) ===
+Tag,TotalMs,Calls,AvgMs,PercentOfTotal,Category
+EntityPlayerLocal.Update,979.0145,2124,0.460930,42.66%,PLAYER
+EntityVehicle.Update,350.4114,8139,0.043053,15.27%,OTHER
+EntityAlive.Update,274.6145,18716,0.014673,11.96%,AI_ENTITY
+EntityAlive.updateStepSound,115.0455,4048,0.028420,5.01%,AI_ENTITY
+GUIWindow.Update,112.8232,20840,0.005414,4.92%,UI
+EntityAlive.updateTasks,94.2526,1563,0.060302,4.11%,AI_ENTITY
+Entity.Update,72.7354,18716,0.003886,3.17%,OTHER
+EntityPlayer.Update,65.1827,2124,0.030689,2.84%,OTHER
+EntityAlive.updateCurrentBlockPosAndValue,62.0956,3504,0.017721,2.71%,AI_ENTITY
+EntityAlive.GetAttackTarget,34.5717,8559,0.004039,1.51%,AI_ENTITY
+EntityAlive.MoveEntityHeaded,31.3974,1557,0.020165,1.37%,AI_ENTITY
+EntityAlive.updateSpeedForwardAndStrafe,27.2874,7074,0.003857,1.19%,AI_ENTITY
+PlayerLocal.ShelterFrameUpdate,20.6492,2123,0.009726,0.90%,PLAYER
+EAIManager.Update,13.5706,1002,0.013544,0.59%,AI_TASK
+PlayerLocal.MoveEntityHeaded,8.4948,501,0.016956,0.37%,PLAYER
+PlayerLocal.BlockRadiusEffectsTick,6.6389,501,0.013251,0.29%,PLAYER
+EntityMoveHelper.UpdateMoveHelper,5.3039,1042,0.005090,0.23%,MOVEMENT
+EntitySeeCache.ClearIfExpired,4.2544,1040,0.004091,0.19%,SENSING
+EntityAlive.GetRevengeTarget,4.2180,1091,0.003866,0.18%,AI_ENTITY
+EntityLookHelper.onUpdateLook,4.1500,1042,0.003983,0.18%,OTHER
+PlayerLocal.updateSpeedForwardAndStrafe,2.9018,530,0.005475,0.13%,PLAYER
+EntityAlive.CanSee,2.2980,147,0.015633,0.10%,AI_ENTITY
+EAIApproachAndAttackTarget.CanExecute,2.2643,167,0.013559,0.10%,AI_TASK
+EntitySeeCache.CanSee,1.0054,147,0.006839,0.04%,SENSING
+
+=== CALL COUNTS ===
+Counter,Value
+EntityAlive.GetAttackTarget.calls,8559
+GetAttackTarget.CacheHit,5563
+EntityAlive.updateStepSound.calls,4048
+updateSpeedForwardAndStrafe.calls,3537
+MoveSpeed.CacheHit,2997
+PlayerLocal.ShelterFrameUpdate.calls,2123
+EntityAlive.GetRevengeTarget.calls,1091
+PlayerLocal.updateSpeedForwardAndStrafe.calls,530
+EntityAlive.updateTasks.calls,521
+updateTasks.calls,521
+EntityAlive.MoveEntityHeaded.calls,519
+MoveEntityHeaded.calls,519
+PlayerLocal.BlockRadiusEffectsTick.calls,501
+PlayerLocal.MoveEntityHeaded.calls,501
+EAIApproachAndAttackTarget.CanExecute.calls,167
+EntityAlive.CanSee.calls,147
+GetRevengeTarget.CacheHit,55
+
+=== OPTIMIZATION EFFECTIVENESS ===
+# Shows how much work our patches skipped vs total calls
+MoveEntityHeaded.Lite: skipped=0, total=519, rate=0.0%
+updateTasks.Lite: skipped=0, total=521, rate=0.0%
+GetAttackTarget: skipped=5563, total=8559, rate=65.0%
+GetRevengeTarget: skipped=55, total=1091, rate=5.0%
+MoveSpeed: skipped=2997, total=2997, rate=100.0%
+
+=== GAME CPU COST PER ZOMBIE ===
+# How much CPU time (ms) the GAME spends per zombie for each system.
+# This is NOT profiling overhead — it is the actual game workload divided by zombie count.
+# Lower values = better optimization. Compare across captures to track improvement.

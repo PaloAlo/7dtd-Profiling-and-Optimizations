@@ -1,0 +1,100 @@
+# HIGH-LOAD CAPTURE: FPS_DROP
+# Timestamp: 2026-03-20T04:55:20.9450654Z
+# Frame: 75968
+# ZombieCount: 59
+# CurrentFPS: 54.82
+# BaselineFPS: 122.41
+# PeakFPS: 192.44
+# FPSDrop%: 55.2%
+# PeakZombies: 74
+# CaptureNumber: 3/5
+# GC_MB: 2435.0
+
+=== TIMING DATA (sorted by TotalMs) ===
+Tag,TotalMs,Calls,AvgMs,PercentOfTotal,Category
+EntityAlive.MoveEntityHeaded,644.1740,43714,0.014736,25.88%,AI_ENTITY
+EntityAlive.updateTasks,515.5775,32522,0.015853,20.72%,AI_ENTITY
+EntityAlive.Update,423.8718,54176,0.007824,17.03%,AI_ENTITY
+EntityPlayerLocal.Update,260.7479,631,0.413230,10.48%,PLAYER
+EAIManager.Update,183.5291,3980,0.046113,7.37%,AI_TASK
+Entity.Update,145.7909,49160,0.002966,5.86%,OTHER
+EntityAlive.updateCurrentBlockPosAndValue,123.4820,22391,0.005515,4.96%,AI_ENTITY
+EntityMoveHelper.UpdateMoveHelper,87.8177,32522,0.002700,3.53%,MOVEMENT
+EntityLookHelper.onUpdateLook,54.6066,32522,0.001679,2.19%,OTHER
+EntityPlayer.Update,12.4846,631,0.019785,0.50%,OTHER
+EntitySeeCache.ClearIfExpired,11.8859,16528,0.000719,0.48%,SENSING
+EntitySeeCache.CanSee,10.9853,2274,0.004831,0.44%,SENSING
+BaseObjective.Update,6.3819,631,0.010114,0.26%,OTHER
+GUIWindow.Update,4.8220,5680,0.000849,0.19%,UI
+EAIBase.Update,1.6328,1324,0.001233,0.07%,AI_TASK
+EntityAlive.updateSpeedForwardAndStrafe,0.9149,534,0.001713,0.04%,AI_ENTITY
+EntityAlive.FindPath,0.1149,33,0.003482,0.00%,AI_ENTITY
+
+=== CALL COUNTS ===
+Counter,Value
+CallChain.GetAttackTarget.from.Direct/Unknown,77422
+GetAttackTarget.Total,77422
+CallChain.GetRevengeTarget.from.Direct/Unknown,45876
+GetRevengeTarget.Total,45876
+Budget.Critical,33925
+GetAttackTarget.CacheHit,23858
+MoveSpeed.CacheHit,22121
+MoveEntityHeaded.calls,21857
+updateTasks.calls,16261
+Budget.Medium,11019
+MoveSpeed.Curved,7484
+Budget.Low,6689
+ZombieFrame.Skipped,5016
+MoveEntityHeaded.LiteMotion,4888
+BlockPosUpdate.Throttled,4487
+updateTasks.LiteRun,3207
+EAIManager.EvalThrottled,3207
+Budget.High,1915
+MoveHelper.Throttled,814
+SeeCache.SharedHit,536
+GetRevengeTarget.CacheHit,485
+PlayerShelter.Throttled,473
+updateSpeedForwardAndStrafe.calls,267
+EntityCollision.Skipped,174
+SpeedStrafe.Throttled,174
+PlayerBlockRadius.Throttled,102
+FindPath.CacheHit,1
+
+=== OPTIMIZATION EFFECTIVENESS ===
+# Shows how much work our patches skipped vs total calls
+MoveEntityHeaded.Lite: skipped=4888, total=21857, rate=22.4%
+updateTasks.Lite: skipped=3207, total=16261, rate=19.7%
+GetAttackTarget: skipped=23858, total=77422, rate=30.8%
+GetRevengeTarget: skipped=485, total=45876, rate=1.1%
+EntityCollision: skipped=174, total=174, rate=100.0%
+MoveHelper: skipped=814, total=814, rate=100.0%
+SpeedStrafe: skipped=174, total=174, rate=100.0%
+EAIManager.Eval: skipped=3207, total=3207, rate=100.0%
+SeeCache.Shared: skipped=536, total=536, rate=100.0%
+PlayerBlockRadius: skipped=102, total=102, rate=100.0%
+PlayerShelter: skipped=473, total=473, rate=100.0%
+ZombieFrame: skipped=5016, total=5016, rate=100.0%
+MoveSpeed: skipped=22121, total=22121, rate=100.0%
+
+=== CALL CHAIN: WHO CALLS GetAttackTarget / GetRevengeTarget ===
+# Format: CallChain.<TargetMethod>.from.<CallerMethod>,Count
+# 'Direct/Unknown' = called from a site we don't instrument
+Caller,Calls
+CallChain.GetAttackTarget.from.Direct/Unknown,77422
+CallChain.GetRevengeTarget.from.Direct/Unknown,45876
+
+=== GAME CPU COST PER ZOMBIE ===
+# How much CPU time (ms) the GAME spends per zombie for each system.
+# This is NOT profiling overhead — it is the actual game workload divided by zombie count.
+# Lower values = better optimization. Compare across captures to track improvement.
+TotalMs per zombie: 42.1834
+EntityAlive.MoveEntityHeaded: 10.9182 ms/zombie
+EntityAlive.updateTasks: 8.7386 ms/zombie
+EntityAlive.Update: 7.1843 ms/zombie
+EntityPlayerLocal.Update: 4.4195 ms/zombie
+EAIManager.Update: 3.1107 ms/zombie
+Entity.Update: 2.4710 ms/zombie
+EntityAlive.updateCurrentBlockPosAndValue: 2.0929 ms/zombie
+EntityMoveHelper.UpdateMoveHelper: 1.4884 ms/zombie
+EntityLookHelper.onUpdateLook: 0.9255 ms/zombie
+EntityPlayer.Update: 0.2116 ms/zombie

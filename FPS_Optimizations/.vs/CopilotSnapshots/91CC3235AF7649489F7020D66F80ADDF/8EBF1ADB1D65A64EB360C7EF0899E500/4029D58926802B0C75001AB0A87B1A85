@@ -1,0 +1,265 @@
+﻿// CallChainInstrumentation.cs
+//
+// Tracks WHO is calling GetAttackTarget / GetRevengeTarget by instrumenting
+// the known call-sites rather than using expensive stack walks.
+//
+// The profiling data shows 123,906 GetAttackTarget calls per capture window.
+// Our per-frame cache catches 63% of them, but we need to know which callers
+// are generating the other 37% (45,619 unique per-entity-per-frame calls).
+//
+// Approach: Harmony patches on every method known to call GetAttackTarget or
+// GetRevengeTarget.  Each patch sets a thread-local "caller tag" before the
+// method runs and clears it after.  The existing GetAttackTarget/GetRevengeTarget
+// timing patches then read this tag to attribute each call to its source.
+//
+// This is zero-overhead when disabled (config flag).  When enabled, the overhead
+// is one thread-local read/write per call — sub-microsecond.
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using HarmonyLib;
+
+public static class CallChainInstrumentation
+{
+    private static bool _applied = false;
+
+    // Thread-local caller tag — set by the outermost caller patch, read by
+    // the GetAttackTarget/GetRevengeTarget interceptor.
+    // Using a stack depth counter so nested calls don't clobber the tag.
+    [ThreadStatic] private static string t_callerTag;
+    [ThreadStatic] private static int t_depth;
+
+    /// <summary>
+    /// Get the current caller tag.  Returns "Unknown" if no caller patch is active.
+    /// </summary>
+    public static string CurrentCallerTag => t_callerTag ?? "Direct/Unknown";
+
+    /// <summary>
+    /// Push a caller tag.  Only the outermost caller sets the tag.
+    /// Returns true if this call set the tag (and must pop it).
+    /// </summary>
+    public static bool PushCaller(string tag)
+    {
+        t_depth++;
+        if (t_depth == 1)
+        {
+            t_callerTag = tag;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Pop a caller tag.  Only pops if this was the outermost push.
+    /// </summary>
+    public static void PopCaller(bool wasOutermost)
+    {
+        t_depth--;
+        if (wasOutermost)
+        {
+            t_callerTag = null;
+        }
+    }
+
+    /// <summary>
+    /// Apply call chain instrumentation patches.
+    /// </summary>
+    public static void Apply(Harmony harmony)
+    {
+        if (_applied || harmony == null) return;
+
+        var asm = AppDomain.CurrentDomain.GetAssemblies()
+            .FirstOrDefault(a => string.Equals(a.GetName().Name, "Assembly-CSharp", StringComparison.OrdinalIgnoreCase));
+        if (asm == null)
+        {
+            LogUtil.Warn("Assembly-CSharp not found.");
+            return;
+        }
+
+        var prefix = new HarmonyMethod(typeof(CallChainInstrumentation).GetMethod(nameof(CallerPrefix), BindingFlags.Public | BindingFlags.Static));
+        var postfix = new HarmonyMethod(typeof(CallChainInstrumentation).GetMethod(nameof(CallerPostfix), BindingFlags.Public | BindingFlags.Static));
+
+        // Known call sites for GetAttackTarget / GetRevengeTarget.
+        // These are the methods that call into the target-query system.
+        // The tag tells us which system generated the call.
+        var callerSites = new (string TypeName, string MethodName, string Tag)[]
+        {
+            // Entity update pipeline
+            ("EntityAlive", "Update", "EntityAlive.Update"),
+            ("EntityAlive", "updateTasks", "updateTasks"),
+            ("EntityAlive", "MoveEntityHeaded", "MoveEntityHeaded"),
+            ("EntityAlive", "OnUpdateLive", "OnUpdateLive"),  // capital O — confirmed via reflection
+
+            // AI task system — CanExecute checks targets, Update runs executing tasks
+            // Note: there is no Execute() method in 7DTD's EAI — the method is Update()
+            // Note: EAIFollowTarget does not exist in this game version
+            ("EAIManager", "Update", "EAIManager.Update"),
+            ("EAISetNearestEntityAsTarget", "CanExecute", "EAI.SetNearest.CanExec"),
+            ("EAISetNearestEntityAsTarget", "Update", "EAI.SetNearest.Update"),
+            ("EAIApproachAndAttackTarget", "CanExecute", "EAI.Approach.CanExec"),
+            ("EAIApproachAndAttackTarget", "Update", "EAI.Approach.Update"),
+            ("EAIBreakBlock", "CanExecute", "EAI.BreakBlock.CanExec"),
+            ("EAIBreakBlock", "Update", "EAI.BreakBlock.Update"),
+            ("EAIRunawayWhenHurt", "CanExecute", "EAI.Runaway.CanExec"),
+            ("EAIRunawayWhenHurt", "Update", "EAI.Runaway.Update"),
+            ("EAISetAsTargetIfHurt", "CanExecute", "EAI.TargetIfHurt.CanExec"),
+            ("EAISetAsTargetIfHurt", "Update", "EAI.TargetIfHurt.Update"),
+            ("EAIRangedAttackTarget", "CanExecute", "EAI.Ranged.CanExec"),
+            ("EAIRangedAttackTarget", "Update", "EAI.Ranged.Update"),
+            ("EAIDestroyArea", "CanExecute", "EAI.DestroyArea.CanExec"),
+            ("EAIDestroyArea", "Update", "EAI.DestroyArea.Update"),
+            ("EAILeap", "CanExecute", "EAI.Leap.CanExec"),
+            ("EAITerritorial", "CanExecute", "EAI.Territorial.CanExec"),
+            ("EAIBlockingTargetTask", "CanExecute", "EAI.Blocking.CanExec"),
+
+            // Vision / sensing
+            ("EntityAlive", "CanSee", "CanSee"),
+            ("EntitySeeCache", "CanSee", "SeeCache.CanSee"),
+
+            // Movement helpers
+            ("EntityMoveHelper", "UpdateMoveHelper", "MoveHelper"),
+            ("EntityLookHelper", "onUpdateLook", "LookHelper"),
+
+            // Collision
+            ("Entity", "entityCollision", "entityCollision"),
+
+            // Player-side (can trigger target queries on nearby entities)
+            ("EntityPlayerLocal", "Update", "PlayerLocal.Update"),
+        };
+
+        int patchCount = 0;
+        foreach (var (typeName, methodName, tag) in callerSites)
+        {
+            try
+            {
+                var type = asm.GetType(typeName);
+                if (type == null)
+                {
+                    // Try short-name lookup
+                    try
+                    {
+                        type = asm.GetTypes().FirstOrDefault(t => t.Name == typeName);
+                    }
+                    catch { }
+                }
+                if (type == null) continue;
+
+                MethodInfo method = null;
+                try
+                {
+                    method = type.GetMethod(methodName,
+                        BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                }
+                catch (AmbiguousMatchException)
+                {
+                    method = type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                        .FirstOrDefault(m => m.Name == methodName && !m.IsAbstract);
+                }
+                if (method == null || method.IsAbstract) continue;
+
+                // Store the tag keyed by "TypeName.MethodName" for reliable lookup
+                _methodTags[$"{type.Name}.{method.Name}"] = tag;
+                harmony.Patch(method, prefix, postfix);
+                patchCount++;
+                LogUtil.Debug($"Patched caller: {typeName}.{methodName} -> \"{tag}\"");
+            }
+            catch (Exception ex)
+            {
+                LogUtil.Debug($"Failed to patch {typeName}.{methodName}: {ex.Message}");
+            }
+        }
+
+        // Now patch GetAttackTarget and GetRevengeTarget themselves to read the caller tag
+        PatchTargetMethods(harmony, asm);
+
+        _applied = true;
+        LogUtil.Info($"Applied {patchCount} caller-site patches + target interceptors.");
+    }
+
+    private static void PatchTargetMethods(Harmony harmony, Assembly asm)
+    {
+        var entityAlive = asm.GetType("EntityAlive");
+        if (entityAlive == null) return;
+
+        var targetPrefix = new HarmonyMethod(typeof(CallChainInstrumentation).GetMethod(nameof(TargetCallPrefix), BindingFlags.Public | BindingFlags.Static));
+
+        // GetAttackTarget
+        var getAttack = entityAlive.GetMethod("GetAttackTarget",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        if (getAttack != null)
+        {
+            try
+            {
+                harmony.Patch(getAttack, targetPrefix);
+                LogUtil.Debug("Intercepting GetAttackTarget");
+            }
+            catch (Exception ex)
+            {
+                LogUtil.Debug($"Failed to intercept GetAttackTarget: {ex.Message}");
+            }
+        }
+
+        // GetRevengeTarget
+        var getRevenge = entityAlive.GetMethod("GetRevengeTarget",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        if (getRevenge != null)
+        {
+            try
+            {
+                harmony.Patch(getRevenge, targetPrefix);
+                LogUtil.Debug("Intercepting GetRevengeTarget");
+            }
+            catch (Exception ex)
+            {
+                LogUtil.Debug($"Failed to intercept GetRevengeTarget: {ex.Message}");
+            }
+        }
+    }
+
+    // --- Method tag storage (string keys for reliable cross-assembly lookup) ---
+    private static readonly Dictionary<string, string> _methodTags = new Dictionary<string, string>();
+
+    // --- Caller site prefix/postfix ---
+    // These wrap every known caller to set the thread-local tag.
+
+    public static void CallerPrefix(MethodBase __originalMethod, out bool __state)
+    {
+        __state = false;
+        if (!ProfilerConfig.Current.EnableCallChainInstrumentation) return;
+        try
+        {
+            string key = $"{__originalMethod.DeclaringType?.Name}.{__originalMethod.Name}";
+            if (_methodTags.TryGetValue(key, out var tag))
+            {
+                __state = PushCaller(tag);
+            }
+        }
+        catch { }
+    }
+
+    public static void CallerPostfix(bool __state)
+    {
+        try
+        {
+            PopCaller(__state);
+        }
+        catch { }
+    }
+
+    // --- Target method (GetAttackTarget / GetRevengeTarget) prefix ---
+    // Records the current caller tag as a counter.
+
+    public static void TargetCallPrefix(MethodBase __originalMethod)
+    {
+        if (!ProfilerConfig.Current.EnableCallChainInstrumentation) return;
+        try
+        {
+            var methodName = __originalMethod?.Name ?? "Unknown";
+            var caller = CurrentCallerTag;
+            ProfilingUtils.PerFrameCounters.Increment($"CallChain.{methodName}.from.{caller}");
+        }
+        catch { }
+    }
+}

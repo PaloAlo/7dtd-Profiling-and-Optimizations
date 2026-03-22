@@ -82,6 +82,10 @@ public static class MoveEntityHeadedLODPatch
                 return true;
             }
 
+            // Never throttle airborne entities — LiteMotion can't handle Y physics
+            // and the entity freezes visibly at the jump apex
+            if (!__instance.onGround && !__instance.isSwimming) return true;
+
             ApplyLiteMotion(__instance);
             ProfilerCounterBridge.Increment("MoveEntityHeaded.LiteMotion");
             return false;

@@ -65,6 +65,11 @@ public static class EntityBudgetSystem
     private const int SURGE_THRESHOLD = 15;
     private const int SURGE_DURATION_FRAMES = 30;
 
+    // Grace period — newly-spawned entities get Critical tier for N frames
+    // so their AI task system fully initializes before any throttling
+    private static readonly Dictionary<int, int> s_firstSeenFrame = new Dictionary<int, int>(128);
+    private const int GRACE_PERIOD_FRAMES = 10;
+
     /// <summary>
     /// True when a large number of entities appeared recently (mass sleeper awakening).
     /// Proximity-only Critical entities are reclassified to High tier during surge.
@@ -86,6 +91,7 @@ public static class EntityBudgetSystem
 
         int frameCount = Time.frameCount;
         var entities = world.Entities.list;
+        int graceCount = 0;
 
         for (int i = 0; i < entities.Count; i++)
         {
@@ -96,6 +102,22 @@ public static class EntityBudgetSystem
             int entityId = entity.entityId;
             float distSq = (entity.position - playerPos).sqrMagnitude;
 
+            // Grace period — newly-spawned entities always get Critical
+            // so AI tasks fully initialize before any throttling kicks in.
+            // This prevents freshly-woken sleepers from appearing unresponsive.
+            bool inGracePeriod = false;
+            if (!s_firstSeenFrame.TryGetValue(entityId, out int firstFrame))
+            {
+                s_firstSeenFrame[entityId] = frameCount;
+                inGracePeriod = true;
+                graceCount++;
+            }
+            else if (frameCount - firstFrame < GRACE_PERIOD_FRAMES)
+            {
+                inGracePeriod = true;
+                graceCount++;
+            }
+
             // Combat check — done ONCE here instead of in every patch
             bool inCombat = entity.GetAttackTarget() != null
                          || entity.GetRevengeTarget() != null
@@ -104,7 +126,7 @@ public static class EntityBudgetSystem
                          || entity.HasInvestigatePosition;
 
             Tier tier;
-            if (distSq < CLOSE_DIST_SQ || inCombat)
+            if (inGracePeriod || distSq < CLOSE_DIST_SQ || inCombat)
             {
                 if (IsSurge && !inCombat)
                 {
@@ -162,6 +184,11 @@ public static class EntityBudgetSystem
         ProfilerCounterBridge.Increment("Budget.High", HighCount);
         ProfilerCounterBridge.Increment("Budget.Medium", MediumCount);
         ProfilerCounterBridge.Increment("Budget.Low", LowCount);
+        // Report how many entities are in the initial grace period this frame
+        if (graceCount > 0)
+        {
+            ProfilerCounterBridge.Increment("Budget.Grace", graceCount);
+        }
     }
 
     /// <summary>
@@ -272,6 +299,7 @@ public static class EntityBudgetSystem
     public static void OnEntityRemoved(int entityId)
     {
         s_entityInfo.Remove(entityId);
+        s_firstSeenFrame.Remove(entityId);
     }
 
     /// <summary>
@@ -280,6 +308,7 @@ public static class EntityBudgetSystem
     public static void Clear()
     {
         s_entityInfo.Clear();
+        s_firstSeenFrame.Clear();
         CriticalCount = 0;
         HighCount = 0;
         MediumCount = 0;

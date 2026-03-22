@@ -19,6 +19,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Diagnostics;
 using HarmonyLib;
 
 public static class CallChainInstrumentation
@@ -90,20 +91,29 @@ public static class CallChainInstrumentation
             ("EntityAlive", "Update", "EntityAlive.Update"),
             ("EntityAlive", "updateTasks", "updateTasks"),
             ("EntityAlive", "MoveEntityHeaded", "MoveEntityHeaded"),
-            ("EntityAlive", "onUpdateLive", "onUpdateLive"),
+            ("EntityAlive", "OnUpdateLive", "OnUpdateLive"),  // capital O — confirmed via reflection
 
-            // AI task system — these iterate and call GetAttackTarget/GetRevengeTarget
+            // AI task system — CanExecute checks targets, Update runs executing tasks
+            // Note: there is no Execute() method in 7DTD's EAI — the method is Update()
+            // Note: EAIFollowTarget does not exist in this game version
             ("EAIManager", "Update", "EAIManager.Update"),
             ("EAISetNearestEntityAsTarget", "CanExecute", "EAI.SetNearest.CanExec"),
-            ("EAISetNearestEntityAsTarget", "Execute", "EAI.SetNearest.Exec"),
+            ("EAISetNearestEntityAsTarget", "Update", "EAI.SetNearest.Update"),
             ("EAIApproachAndAttackTarget", "CanExecute", "EAI.Approach.CanExec"),
-            ("EAIApproachAndAttackTarget", "Execute", "EAI.Approach.Exec"),
+            ("EAIApproachAndAttackTarget", "Update", "EAI.Approach.Update"),
             ("EAIBreakBlock", "CanExecute", "EAI.BreakBlock.CanExec"),
-            ("EAIBreakBlock", "Execute", "EAI.BreakBlock.Exec"),
-            ("EAIFollowTarget", "CanExecute", "EAI.Follow.CanExec"),
-            ("EAIFollowTarget", "Execute", "EAI.Follow.Exec"),
+            ("EAIBreakBlock", "Update", "EAI.BreakBlock.Update"),
             ("EAIRunawayWhenHurt", "CanExecute", "EAI.Runaway.CanExec"),
-            ("EAIRunawayWhenHurt", "Execute", "EAI.Runaway.Exec"),
+            ("EAIRunawayWhenHurt", "Update", "EAI.Runaway.Update"),
+            ("EAISetAsTargetIfHurt", "CanExecute", "EAI.TargetIfHurt.CanExec"),
+            ("EAISetAsTargetIfHurt", "Update", "EAI.TargetIfHurt.Update"),
+            ("EAIRangedAttackTarget", "CanExecute", "EAI.Ranged.CanExec"),
+            ("EAIRangedAttackTarget", "Update", "EAI.Ranged.Update"),
+            ("EAIDestroyArea", "CanExecute", "EAI.DestroyArea.CanExec"),
+            ("EAIDestroyArea", "Update", "EAI.DestroyArea.Update"),
+            ("EAILeap", "CanExecute", "EAI.Leap.CanExec"),
+            ("EAITerritorial", "CanExecute", "EAI.Territorial.CanExec"),
+            ("EAIBlockingTargetTask", "CanExecute", "EAI.Blocking.CanExec"),
 
             // Vision / sensing
             ("EntityAlive", "CanSee", "CanSee"),
@@ -135,7 +145,11 @@ public static class CallChainInstrumentation
                     }
                     catch { }
                 }
-                if (type == null) continue;
+                if (type == null)
+                {
+                    LogUtil.Debug($"Type not found: {typeName}");
+                    continue;
+                }
 
                 MethodInfo method = null;
                 try
@@ -148,7 +162,16 @@ public static class CallChainInstrumentation
                     method = type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
                         .FirstOrDefault(m => m.Name == methodName && !m.IsAbstract);
                 }
-                if (method == null || method.IsAbstract) continue;
+                if (method == null)
+                {
+                    LogUtil.Debug($"Method not found: {typeName}.{methodName}");
+                    continue;
+                }
+                if (method.IsAbstract)
+                {
+                    LogUtil.Debug($"Skipping abstract: {typeName}.{methodName}");
+                    continue;
+                }
 
                 // Store the tag keyed by "TypeName.MethodName" for reliable lookup
                 _methodTags[$"{type.Name}.{method.Name}"] = tag;
@@ -158,7 +181,7 @@ public static class CallChainInstrumentation
             }
             catch (Exception ex)
             {
-                LogUtil.Debug($"Failed to patch {typeName}.{methodName}: {ex.Message}");
+                LogUtil.Warn($"Failed to patch caller {typeName}.{methodName}: {ex.Message}");
             }
         }
 
@@ -211,6 +234,15 @@ public static class CallChainInstrumentation
 
     // --- Method tag storage (string keys for reliable cross-assembly lookup) ---
     private static readonly Dictionary<string, string> _methodTags = new Dictionary<string, string>();
+    // One-shot Direct/Unknown diagnostics: when many calls originate from
+    // unknown caller sites in a single frame, capture a lightweight stack
+    // snapshot once to help locate uninstrumented call sites.  This is
+    // intentionally conservative to avoid runtime overhead.
+    private static readonly object s_directLock = new object();
+    private static int s_directLastFrame = -1;
+    private static readonly Dictionary<string, int> s_directCounts = new Dictionary<string, int>(16);
+    private static readonly HashSet<string> s_directTriggered = new HashSet<string>(16);
+    private const int DIRECT_UNKNOWN_THRESHOLD = 25; // per-target-method per-frame
 
     // --- Caller site prefix/postfix ---
     // These wrap every known caller to set the thread-local tag.
@@ -232,10 +264,9 @@ public static class CallChainInstrumentation
 
     public static void CallerPostfix(bool __state)
     {
-        if (!__state) return;
         try
         {
-            PopCaller(true);
+            PopCaller(__state);
         }
         catch { }
     }
@@ -251,6 +282,38 @@ public static class CallChainInstrumentation
             var methodName = __originalMethod?.Name ?? "Unknown";
             var caller = CurrentCallerTag;
             ProfilingUtils.PerFrameCounters.Increment($"CallChain.{methodName}.from.{caller}");
+
+            // If caller is unknown, increment a per-frame counter and
+            // optionally capture a one-shot stack snapshot for diagnostics.
+            if (caller == "Direct/Unknown")
+            {
+                lock (s_directLock)
+                {
+                    int frame = Time.frameCount;
+                    if (frame != s_directLastFrame)
+                    {
+                        s_directLastFrame = frame;
+                        s_directCounts.Clear();
+                        s_directTriggered.Clear();
+                    }
+
+                    if (!s_directCounts.TryGetValue(methodName, out int cnt)) cnt = 0;
+                    cnt++;
+                    s_directCounts[methodName] = cnt;
+
+                    if (cnt >= DIRECT_UNKNOWN_THRESHOLD && !s_directTriggered.Contains(methodName))
+                    {
+                        s_directTriggered.Add(methodName);
+                        try
+                        {
+                            // Capture a lightweight stack trace and log it for diagnostics.
+                            var st = new StackTrace(2, false); // skip frames for the instrumentation
+                            LogUtil.Warn($"CallChain: many Direct/Unknown calls for {methodName} — stack trace (single-shot): {st}");
+                        }
+                        catch { }
+                    }
+                }
+            }
         }
         catch { }
     }
