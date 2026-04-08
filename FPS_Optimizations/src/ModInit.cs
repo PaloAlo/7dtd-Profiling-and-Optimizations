@@ -9,12 +9,19 @@ public class ModInit : IModApi
     {
         OptimizationConfig.Load();
 
+        // Start file watcher for hot-reload (reads same folder used by Load)
+        OptimizationConfig.StartFileWatcher();
+
         // resolve profiler bridge early so we can log availability
         ProfilerCounterBridge.EnsureResolved();
 
         var harmony = new Harmony("7dtd.PaLoALo.fps_optimizations");
         harmony.PatchAll(Assembly.GetExecutingAssembly());
 
-        Log.Out($"[FPS_Optimizations] Loaded. MoveLOD={OptimizationConfig.Current.EnableMoveLOD}, TargetCache={OptimizationConfig.Current.EnableTargetCache}");
+        var cfg = OptimizationConfig.Current;
+        Log.Out($"[FPS_Optimizations] Loaded v{cfg.Version}. MoveLOD={cfg.EnableMoveLOD}, TargetCache={cfg.EnableTargetCache}, "
+              + $"SleeperThrottle={cfg.EnableSleeperVolumeThrottle}, VehicleRBSleep={cfg.EnableVehicleRigidbodySleep}, "
+              + $"JiggleBone={cfg.EnableJiggleBoneToggle}, ChunkBudget={cfg.EnableChunkCopyTimeBudget}, "
+              + $"ChunkDir={cfg.EnableChunkDirectionalPriority}, ThreadPool={cfg.EnableThreadPoolConsolidation}");
     }
 }

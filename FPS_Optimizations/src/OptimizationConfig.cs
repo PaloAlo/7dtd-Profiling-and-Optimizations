@@ -3,6 +3,9 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Generic;
 using Newtonsoft.Json;
 
 [Serializable]
@@ -48,11 +51,37 @@ public class OptimizationConfig
     public float SpeedCurveFarDistSq = 6400f;      // 80m — aligned with budget system FAR_DIST_SQ
     public float SpeedCurveMinMult = 0.35f;        // min speed multiplier (35%)
 
+    // Throttle World.TickSleeperVolumes to every 4th tick
+    public bool EnableSleeperVolumeThrottle = true;
+
+    // Sleep idle vehicle rigidbodies (no driver, no motion, no input)
+    public bool EnableVehicleRigidbodySleep = true;
+
+    // Disable jiggle bones on distant entities (>50m)
+    public bool EnableJiggleBoneToggle = true;
+
+    // Time-budget ChunkManager.CopyChunksToUnity to deltaTime*0.5 (2-8ms)
+    public bool EnableChunkCopyTimeBudget = true;
+
+    // Reorder chunk copy queue to prioritise player-facing direction
+    public bool EnableChunkDirectionalPriority = true;
+
+    // Redirect bursty game threads (ChunkCalc, ChunkMeshBake, ChunkRegeneration,
+    // GenerateChunks, SaveChunks, WaterSimulationApplyChanges) to the .NET thread pool
+    public bool EnableThreadPoolConsolidation = true;
+
     public const string ConfigFileName = "fps_optimization_config.json";
-    private const int ConfigVersion = 7;
+    private const int ConfigVersion = 8;
     public int Version = ConfigVersion;
 
     public static OptimizationConfig Current { get; private set; } = new OptimizationConfig();
+
+    // --- File watcher for hot-reload ---
+    private static FileSystemWatcher s_watcher;
+    private static readonly object s_watcherLock = new object();
+    private static string s_watcherFolder;
+    private static DateTime s_lastReload = DateTime.MinValue;
+    private const int ReloadDebounceMs = 300;
 
     public static void Load(string folder = null)
     {
@@ -60,6 +89,8 @@ public class OptimizationConfig
         {
             if (string.IsNullOrEmpty(folder))
                 folder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            s_watcherFolder = folder;
 
             string path = Path.Combine(folder, ConfigFileName);
 
@@ -104,5 +135,224 @@ public class OptimizationConfig
         {
             Log.Warning($"[FPSOptimizations] Failed to save config: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Reloads the config file from disk, applies it, clears only per-feature caches
+    /// affected by changes, and returns a changelog string listing top-level fields that changed.
+    /// Safe to call from console or from the FileSystemWatcher background task.
+    /// </summary>
+    public static string ReloadAndReport()
+    {
+        try
+        {
+            string folder = s_watcherFolder;
+            if (string.IsNullOrEmpty(folder))
+                folder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            string path = Path.Combine(folder, ConfigFileName);
+            if (!File.Exists(path))
+                return $"Config file not found: {path}";
+
+            string json = File.ReadAllText(path);
+            var loaded = JsonConvert.DeserializeObject<OptimizationConfig>(json);
+            if (loaded == null)
+                return "Failed to deserialize config (null)";
+
+            // Build list of changed public instance fields
+            var changes = new List<string>();
+            var fields = typeof(OptimizationConfig).GetFields(BindingFlags.Public | BindingFlags.Instance);
+            var changedFieldNames = new List<string>();
+            foreach (var f in fields)
+            {
+                try
+                {
+                    object oldVal = f.GetValue(Current);
+                    object newVal = f.GetValue(loaded);
+                    if (!Equals(oldVal, newVal))
+                    {
+                        changes.Add($"{f.Name}: {oldVal ?? "null"} -> {newVal ?? "null"}");
+                        changedFieldNames.Add(f.Name);
+                    }
+                }
+                catch { /* ignore individual field compare errors */ }
+            }
+
+            // Apply loaded config
+            Current = loaded;
+
+            // Map field names to targeted cache-clear actions (per-feature)
+            var clearActions = new Dictionary<string, Action>(StringComparer.OrdinalIgnoreCase)
+            {
+                // Movement / LOD related
+                ["EnableMoveLOD"] = () => { MoveEntityHeadedLODPatch.ClearCaches(); ZombieFrameSkipPatch.ClearCaches(); MoveHelperThrottlePatch.ClearCaches(); EntityCollisionThrottlePatch.ClearCaches(); },
+                ["EnableSpeedCurveLOD"] = () => { MoveEntityHeadedLODPatch.ClearCaches(); },
+                ["SpeedCurveZombieThreshold"] = () => { MoveEntityHeadedLODPatch.ClearCaches(); },
+                ["SpeedCurveCloseDistSq"] = () => { MoveEntityHeadedLODPatch.ClearCaches(); },
+                ["SpeedCurveFarDistSq"] = () => { MoveEntityHeadedLODPatch.ClearCaches(); },
+                ["SpeedCurveMinMult"] = () => { MoveEntityHeadedLODPatch.ClearCaches(); },
+
+                // UpdateTasks / staggered update
+                ["EnableStaggeredUpdate"] = () => { UpdateTasksLODPatch.ClearCaches(); },
+
+                // Path / path cache
+                ["EnablePathCache"] = () => { FindPathCachePatch.Clear(); },
+                ["PathCacheTTLSeconds"] = () => { FindPathCachePatch.Clear(); },
+
+                // Target caches
+                ["EnableTargetCache"] = () => { GetAttackTargetCachePatch.ClearCaches(); GetRevengeTargetCachePatch.ClearCaches(); },
+
+                // Step sound throttle
+                ["EnableStepSoundThrottle"] = () => { ThrottleStepSoundPatch.ClearCaches(); },
+
+                // Block pos throttle
+                ["EnableBlockPosThrottle"] = () => { BlockPosUpdateThrottlePatch.ClearCaches(); },
+
+                // EAI manager throttle
+                ["EnableEAIManagerThrottle"] = () => { EAIManagerUpdateThrottlePatch.ClearCaches(); },
+
+                // Move speed cache
+                ["EnableMoveLOD"] = () => { MoveSpeedCachePatch.ClearCaches(); },
+
+                // Chunk features
+                ["EnableChunkCopyTimeBudget"] = () => { ChunkCopyTimeBudgetPatch.ClearCaches(); },
+                ["EnableChunkDirectionalPriority"] = () => { ChunkDirectionalPriorityPatch.ClearCaches(); },
+
+                // Budget / entity classification
+                ["MoveLODTier1DistSq"] = () => { EntityBudgetSystem.Clear(); },
+                ["MoveLODTier2DistSq"] = () => { EntityBudgetSystem.Clear(); },
+                ["MoveLODTier3DistSq"] = () => { EntityBudgetSystem.Clear(); },
+
+                // Thread pool consolidation doesn't have a runtime cache to clear,
+                // but we report the change.
+            };
+
+            // Always clear the budget system if any distance thresholds changed
+            foreach (var name in changedFieldNames)
+            {
+                if (name.IndexOf("MoveLOD", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    name.IndexOf("SpeedCurve", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    // Ensure MoveEntityHeaded and Budget are refreshed
+                    if (!clearActions.ContainsKey("EnableMoveLOD"))
+                        MoveEntityHeadedLODPatch.ClearCaches();
+                    EntityBudgetSystem.Clear();
+                }
+            }
+
+            // Execute clear actions for explicit field changes
+            foreach (var name in changedFieldNames)
+            {
+                if (clearActions.TryGetValue(name, out var act))
+                {
+                    try { act(); } catch { }
+                }
+            }
+
+            // Additionally, if core toggles that are broad changed (e.g., EnableMoveLOD
+            // disabled entirely) we may opt to clear related caches as above; already handled.
+
+            // Return changelog
+            if (changes.Count == 0)
+                return "No changes detected.";
+
+            return string.Join("\n", changes);
+        }
+        catch (Exception ex)
+        {
+            return $"Reload failed: {ex.GetType().Name}: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Starts watching the config file for changes and performs a debounced reload.
+    /// Call from ModInit after Load().
+    /// </summary>
+    public static void StartFileWatcher(string folder = null)
+    {
+        lock (s_watcherLock)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(folder))
+                    s_watcherFolder = folder;
+
+                if (string.IsNullOrEmpty(s_watcherFolder))
+                    s_watcherFolder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+                if (s_watcher != null)
+                {
+                    // already running
+                    return;
+                }
+
+                s_watcher = new FileSystemWatcher(s_watcherFolder, ConfigFileName);
+                s_watcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.CreationTime;
+                s_watcher.Changed += OnConfigFileChanged;
+                s_watcher.Created += OnConfigFileChanged;
+                s_watcher.Deleted += OnConfigFileChanged;
+                s_watcher.Renamed += OnConfigFileChanged;
+                s_watcher.EnableRaisingEvents = true;
+
+                Log.Out("[FPSOptimizations] Config file watcher started: " + Path.Combine(s_watcherFolder, ConfigFileName));
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[FPSOptimizations] Failed to start config watcher: " + ex.Message);
+                s_watcher = null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Stops watching the config file.
+    /// </summary>
+    public static void StopFileWatcher()
+    {
+        lock (s_watcherLock)
+        {
+            if (s_watcher == null) return;
+            try
+            {
+                s_watcher.EnableRaisingEvents = false;
+                s_watcher.Changed -= OnConfigFileChanged;
+                s_watcher.Created -= OnConfigFileChanged;
+                s_watcher.Deleted -= OnConfigFileChanged;
+                s_watcher.Renamed -= OnConfigFileChanged;
+                s_watcher.Dispose();
+            }
+            catch { }
+            finally
+            {
+                s_watcher = null;
+            }
+        }
+    }
+
+    private static void OnConfigFileChanged(object sender, FileSystemEventArgs e)
+    {
+        // Debounce rapid events and give the writer a moment to finish.
+        var now = DateTime.UtcNow;
+        if ((now - s_lastReload).TotalMilliseconds < ReloadDebounceMs)
+            return;
+
+        s_lastReload = now;
+
+        // Run reload on a background task, give the writer a short delay.
+        Task.Run(() =>
+        {
+            try
+            {
+                Thread.Sleep(150); // small delay so replacing editors/zipwriters finish
+
+                // Use ReloadAndReport which applies config and clears per-feature caches
+                string report = ReloadAndReport();
+                Log.Out("[FPSOptimizations] Hot-reload: " + report);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[FPSOptimizations] Hot-reload failed: " + ex.Message);
+            }
+        });
     }
 }

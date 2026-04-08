@@ -13,11 +13,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\FPSOptimizations.csproj",
+      "projectUniqueName": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\FPSOptimizations.csproj",
       "projectName": "FPS_Optimizations",
-      "projectPath": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\FPSOptimizations.csproj",
+      "projectPath": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\FPSOptimizations.csproj",
       "packagesPath": "C:\\Users\\Gamer\\.nuget\\packages\\",
-      "outputPath": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\obj\\",
+      "outputPath": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\Gamer\\AppData\\Roaming\\NuGet\\NuGet.Config",

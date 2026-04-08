@@ -42,6 +42,8 @@ static class GetAttackTargetCachePatch
     }
 
     public static void OnEntityRemoved(int entityId) => s_cache.Remove(entityId);
+
+    public static void ClearCaches() => s_cache.Clear();
 }
 
 [HarmonyPatch(typeof(EntityAlive), nameof(EntityAlive.GetRevengeTarget))]
@@ -77,4 +79,6 @@ static class GetRevengeTargetCachePatch
     }
 
     public static void OnEntityRemoved(int entityId) => s_cache.Remove(entityId);
+
+    public static void ClearCaches() => s_cache.Clear();
 }

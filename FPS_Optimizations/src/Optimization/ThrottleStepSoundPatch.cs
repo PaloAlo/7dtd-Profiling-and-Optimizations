@@ -28,4 +28,6 @@ public static class ThrottleStepSoundPatch
         LastPlayed[id] = now;
         return true;
     }
+
+    public static void ClearCaches() => LastPlayed.Clear();
 }

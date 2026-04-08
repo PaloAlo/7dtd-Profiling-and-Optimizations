@@ -1,6 +1,6 @@
 is_global = true
 build_property.RootNamespace = FPS_Optimizations
-build_property.ProjectDir = E:\GitHub\7dtd\my mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\FPS_Optimizations\
+build_property.ProjectDir = E:\GitHub\7dtd\my_mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\FPS_Optimizations\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.CsWinRTUseWindowsUIXamlProjections = false

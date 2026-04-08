@@ -1,7 +1,20 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "E:\\GitHub\\7dtd\\my mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\",
-  "Documents": [],
+  "WorkspaceRootPath": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my_mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimization\\threadpoolconsolidationpatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimization\\threadpoolconsolidationpatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my_mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\optimizationconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\optimizationconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|e:\\github\\7dtd\\my_mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\fps_optimizations\\src\\modinit.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3872BA19-7760-964E-C142-1DAFA801FE78}|FPSOptimizations.csproj|solutionrelative:src\\modinit.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
@@ -9,11 +22,50 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": -1,
+          "SelectedChildIndex": 2,
           "Children": [
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{40ea2e6b-2121-4bb8-a43e-c83c04b51041}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "ModInit.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\ModInit.cs",
+              "RelativeDocumentMoniker": "src\\ModInit.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\ModInit.cs",
+              "RelativeToolTip": "src\\ModInit.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAAAiAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-07T21:25:27.864Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "ThreadPoolConsolidationPatch.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\ThreadPoolConsolidationPatch.cs",
+              "RelativeDocumentMoniker": "src\\Optimization\\ThreadPoolConsolidationPatch.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\Optimization\\ThreadPoolConsolidationPatch.cs",
+              "RelativeToolTip": "src\\Optimization\\ThreadPoolConsolidationPatch.cs",
+              "ViewState": "AgIAACIAAAAAAAAAAAASwCkAAAAGAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-07T21:25:10.157Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "OptimizationConfig.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\OptimizationConfig.cs",
+              "RelativeDocumentMoniker": "src\\OptimizationConfig.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\FPS_Optimizations\\src\\OptimizationConfig.cs",
+              "RelativeToolTip": "src\\OptimizationConfig.cs",
+              "ViewState": "AgIAADYAAAAAAAAAAAAowK0AAABYAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-07T21:23:51.695Z",
+              "EditorCaption": ""
             }
           ]
         }
