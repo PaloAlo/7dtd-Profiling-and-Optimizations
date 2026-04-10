@@ -4,6 +4,7 @@
 - NEVER ADD PREFIXES TO LOGGING
 - Avoid copying other modders' code; when using their ideas, implement independently.
 - Provide concise progress updates; avoid stalling mid-sentence. Continue tasks, report build results, and resume work until requested to stop.
+- Allow autonomous progress; proceed without interrupting the user until scans or implementations are complete.
 
 ## Project Guidelines
 - Optimization mod (FPS Optimizations) reports runtime counters into the Profiler via reflection into `ProfilingUtils.PerFrameCounters`; keep `PerFrameCounters` API stable and preserve reflection bridge compatibility.

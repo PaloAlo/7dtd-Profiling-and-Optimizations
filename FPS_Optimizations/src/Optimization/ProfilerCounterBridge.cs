@@ -16,6 +16,7 @@ using System.Runtime.CompilerServices;
 public static class ProfilerCounterBridge
 {
     private static Action<string, long> s_increment;
+    private static Action<string, double> s_recordTiming;
     private static bool s_resolved;
     private static int s_resolveAttempts;
     private const int MaxResolveAttempts = 20;
@@ -39,6 +40,17 @@ public static class ProfilerCounterBridge
     {
         if (!s_resolved) Resolve();
         s_increment?.Invoke(key, amount);
+    }
+
+    /// <summary>
+    /// Record a timing sample (ms) into the profiler's timing system.
+    /// Entries recorded here appear in the periodic CSV top-methods list.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void RecordTiming(string tag, double milliseconds)
+    {
+        if (!s_resolved) Resolve();
+        s_recordTiming?.Invoke(tag, milliseconds);
     }
 
     private static void Resolve()
@@ -94,6 +106,22 @@ public static class ProfilerCounterBridge
 
             s_increment = (Action<string, long>)Delegate.CreateDelegate(
                 typeof(Action<string, long>), method);
+
+            // Also resolve RecordTiming(string, double) for timing entries
+            // that appear in the periodic CSV top-methods list.
+            try
+            {
+                var recordMethod = profilingType.GetMethod("RecordTiming",
+                    BindingFlags.Public | BindingFlags.Static,
+                    null, new[] { typeof(string), typeof(double) }, null);
+                if (recordMethod != null)
+                {
+                    s_recordTiming = (Action<string, double>)Delegate.CreateDelegate(
+                        typeof(Action<string, double>), recordMethod);
+                }
+            }
+            catch { }
+
             s_resolved = true;
             Log.Out("[FPSOptimizations] ProfilerCounterBridge: connected to profiler successfully.");
         }

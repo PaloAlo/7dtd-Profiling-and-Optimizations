@@ -1,0 +1,43 @@
+﻿// PrefabLODInstrumentation.cs
+//
+// Lightweight instrumentation for PrefabLODManager.FrameUpdate()
+// - records calls and accumulates time (ms) into profiler per-frame counters
+// - guarded by ProfilerCounterBridge availability to be zero-cost when profiler absent
+//
+// Only instrumentation (no throttling) as requested.
+
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(PrefabLODManager), "FrameUpdate")]
+public static class PrefabLODInstrumentation
+{
+    // Per-thread start timestamp — safe and extremely low overhead.
+    [System.ThreadStatic]
+    private static float t_startRealtime;
+
+    // Called before the real FrameUpdate() runs
+    public static void Prefix()
+    {
+        // If profiler not present, skip instrumentation entirely.
+        if (!ProfilerCounterBridge.IsProfilerAvailable) return;
+
+        // Count the call and start the timer
+        ProfilerCounterBridge.Increment("PrefabLOD.FrameUpdate.calls");
+        t_startRealtime = Time.realtimeSinceStartup;
+    }
+
+    // Called after the real FrameUpdate() completes
+    public static void Postfix()
+    {
+        if (!ProfilerCounterBridge.IsProfilerAvailable) return;
+
+        // Compute elapsed ms and report
+        float dt = Time.realtimeSinceStartup - t_startRealtime;
+        long ms = (long)(dt * 1000f);
+        if (ms > 0)
+        {
+            ProfilerCounterBridge.Increment("PrefabLOD.FrameUpdate.ms", ms);
+        }
+    }
+}

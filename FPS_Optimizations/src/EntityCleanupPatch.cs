@@ -23,5 +23,6 @@ static class EntityCleanupPatch
         BlockPosUpdateThrottlePatch.OnEntityRemoved(_entityId);
         EAIManagerUpdateThrottlePatch.OnEntityRemoved(_entityId);
         EntityBudgetSystem.OnEntityRemoved(_entityId);
+        ParticleEffectThrottlePatch.OnEntityRemoved(_entityId);
     }
 }

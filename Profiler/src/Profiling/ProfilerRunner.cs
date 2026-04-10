@@ -72,9 +72,10 @@ public class ProfilerRunner : MonoBehaviour
 
             var go = new GameObject("ProfilerRunner");
             UnityEngine.Object.DontDestroyOnLoad(go);
-            Instance = go.AddComponent<ProfilerRunner>();
+            Instance = go.AddComponent<ProfilerRunner>();   
 
-            Instance._outPath = ProfilingUtils.ResolveOutputPath("7dtd_profile.csv");
+            var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+            Instance._outPath = ProfilingUtils.ResolveOutputPath($"7dtd_profile_{timestamp}.csv");
             Instance._headerWritten = false;
 
             LogUtil.Info($"ProfilerRunner initialized. Profiling={ProfilerConfig.Current.EnableProfiling}, DumpPath={Instance._outPath}");
@@ -223,7 +224,9 @@ public class ProfilerRunner : MonoBehaviour
 
         var zombieCount = FindZombieCount();
         var currentFps = _fpsHistory.Count > 0 ? _fpsHistory.Average() : 60f;
-        var isCurrentlyHighLoad = zombieCount >= MinZombiesForCapture || currentFps < LowFpsThreshold;
+        var isCurrentlyHighLoad = zombieCount >= MinZombiesForCapture
+            || currentFps < LowFpsThreshold
+            || (_baselineEstablished && currentFps < _baselineFps * 0.6f);
 
         if (_wasInHighLoad && !isCurrentlyHighLoad && zombieCount < 20)
         {
@@ -256,15 +259,24 @@ public class ProfilerRunner : MonoBehaviour
         if (timeSinceLastCapture < CaptureDebounceSeconds) return;
 
         var zombieCount = FindZombieCount();
-        if (zombieCount < MinZombiesForCapture) return;
-
         var currentFps = _fpsHistory.Count > 0 ? _fpsHistory.Average() : 60f;
+
+        // FPS-based triggers fire regardless of zombie count — a significant
+        // drop or absolute low FPS is worth capturing even with few zombies.
         var fpsDroppedSignificantly = _baselineEstablished && currentFps < _baselineFps * 0.5f;
         var fpsBelowThreshold = currentFps < LowFpsThreshold;
 
-        if (fpsBelowThreshold || fpsDroppedSignificantly)
+        if (fpsBelowThreshold)
         {
-            CaptureHighLoadDump(zombieCount, currentFps, fpsBelowThreshold ? "LOW_FPS" : "FPS_DROP");
+            CaptureHighLoadDump(zombieCount, currentFps, "LOW_FPS");
+        }
+        else if (fpsDroppedSignificantly)
+        {
+            CaptureHighLoadDump(zombieCount, currentFps, "FPS_DROP");
+        }
+        else if (zombieCount >= MinZombiesForCapture)
+        {
+            CaptureHighLoadDump(zombieCount, currentFps, "HIGH_ZOMBIE_COUNT");
         }
     }
 

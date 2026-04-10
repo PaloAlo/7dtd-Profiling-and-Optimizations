@@ -89,6 +89,9 @@ public static class FrameCache
         {
             EntityBudgetSystem.ClassifyEntities(world, PlayerPosition, zombieCount);
         }
+
+        // Periodic cleanup for UAI decision throttle counters
+        UAIDecisionThrottlePatch.CleanupStaleEntries();
     }
 
     public static void ClearAllOptimizationCaches()
@@ -104,6 +107,9 @@ public static class FrameCache
         FindPathCachePatch.Clear();
         BlockPosUpdateThrottlePatch.ClearCaches();
         EAIManagerUpdateThrottlePatch.ClearCaches();
+        UAIDecisionThrottlePatch.ClearCaches();
+        ParticleEffectThrottlePatch.ClearCaches();
+        ThreatLevelThrottlePatch.ClearCaches();
         EntityBudgetSystem.Clear();
     }
 }

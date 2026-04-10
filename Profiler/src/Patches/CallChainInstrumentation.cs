@@ -21,6 +21,7 @@ using System.Linq;
 using System.Reflection;
 using System.Diagnostics;
 using HarmonyLib;
+using UnityEngine;
 
 public static class CallChainInstrumentation
 {
@@ -154,17 +155,21 @@ public static class CallChainInstrumentation
                 MethodInfo method = null;
                 try
                 {
+                    // Use DeclaredOnly so we only patch methods actually
+                    // overridden on this type, not inherited virtuals from
+                    // a base class (e.g. EAIBase.Update() when the subclass
+                    // doesn't override it).
                     method = type.GetMethod(methodName,
-                        BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                        BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
                 }
                 catch (AmbiguousMatchException)
                 {
-                    method = type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                    method = type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
                         .FirstOrDefault(m => m.Name == methodName && !m.IsAbstract);
                 }
                 if (method == null)
                 {
-                    LogUtil.Debug($"Method not found: {typeName}.{methodName}");
+                    LogUtil.Debug($"Method not found (DeclaredOnly): {typeName}.{methodName} — not overridden on this type");
                     continue;
                 }
                 if (method.IsAbstract)

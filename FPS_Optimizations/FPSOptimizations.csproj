@@ -9,4 +9,8 @@
 		<ModFolderName>PaLoALo-V2-FPS_Optimizations</ModFolderName>
 	</PropertyGroup>
 
+	<ItemGroup>
+	  <Compile Remove="src\Optimization\PrefabLODInstrumentation.cs" />
+	</ItemGroup>
+
 </Project>

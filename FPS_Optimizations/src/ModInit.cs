@@ -18,10 +18,15 @@ public class ModInit : IModApi
         var harmony = new Harmony("7dtd.PaLoALo.fps_optimizations");
         harmony.PatchAll(Assembly.GetExecutingAssembly());
 
+        // Deferred patches for overloaded methods (can't use attribute-based patching)
+        PhysicsQueryDeferredPatches.Apply(harmony);
+
         var cfg = OptimizationConfig.Current;
         Log.Out($"[FPS_Optimizations] Loaded v{cfg.Version}. MoveLOD={cfg.EnableMoveLOD}, TargetCache={cfg.EnableTargetCache}, "
               + $"SleeperThrottle={cfg.EnableSleeperVolumeThrottle}, VehicleRBSleep={cfg.EnableVehicleRigidbodySleep}, "
               + $"JiggleBone={cfg.EnableJiggleBoneToggle}, ChunkBudget={cfg.EnableChunkCopyTimeBudget}, "
-              + $"ChunkDir={cfg.EnableChunkDirectionalPriority}, ThreadPool={cfg.EnableThreadPoolConsolidation}");
+              + $"ChunkDir={cfg.EnableChunkDirectionalPriority}, ThreadPool={cfg.EnableThreadPoolConsolidation}, "
+              + $"UAIThrottle={cfg.EnableUAIDecisionThrottle}, ParticleThrottle={cfg.EnableParticleThrottle}, "
+              + $"ThreatLevelThrottle={cfg.EnableThreatLevelThrottle}");
     }
 }

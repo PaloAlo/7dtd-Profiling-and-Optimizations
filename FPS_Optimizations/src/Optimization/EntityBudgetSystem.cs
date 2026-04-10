@@ -118,9 +118,19 @@ public static class EntityBudgetSystem
                 graceCount++;
             }
 
-            // Combat check — done ONCE here instead of in every patch
-            bool inCombat = entity.GetAttackTarget() != null
-                         || entity.GetRevengeTarget() != null
+            // Combat check — done ONCE here instead of in every patch.
+            // Read backing fields directly to bypass Harmony/Profiler interception
+            // on GetAttackTarget()/GetRevengeTarget(), then seed the target cache
+            // so downstream callers this frame get cache hits.
+            var attackTgt = entity.attackTarget;
+            var revengeTgt = entity.revengeEntity;
+            if (OptimizationConfig.Current.EnableTargetCache)
+            {
+                GetAttackTargetCachePatch.SeedCache(entityId, attackTgt);
+                GetRevengeTargetCachePatch.SeedCache(entityId, revengeTgt);
+            }
+            bool inCombat = attackTgt != null
+                         || revengeTgt != null
                          || entity.hasBeenAttackedTime > 0
                          || entity.isAlert
                          || entity.HasInvestigatePosition;

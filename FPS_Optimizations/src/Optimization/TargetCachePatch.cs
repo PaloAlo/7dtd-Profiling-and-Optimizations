@@ -41,6 +41,16 @@ static class GetAttackTargetCachePatch
         s_cache[__instance.entityId] = (Time.frameCount, __result);
     }
 
+    /// <summary>
+    /// Seed the cache from an external caller (e.g. EntityBudgetSystem) that already
+    /// read the backing field directly. This lets later callers hit the cache.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void SeedCache(int entityId, EntityAlive target)
+    {
+        s_cache[entityId] = (Time.frameCount, target);
+    }
+
     public static void OnEntityRemoved(int entityId) => s_cache.Remove(entityId);
 
     public static void ClearCaches() => s_cache.Clear();
@@ -76,6 +86,16 @@ static class GetRevengeTargetCachePatch
     {
         if (!OptimizationConfig.Current.EnableTargetCache) return;
         s_cache[__instance.entityId] = (Time.frameCount, __result);
+    }
+
+    /// <summary>
+    /// Seed the cache from an external caller (e.g. EntityBudgetSystem) that already
+    /// read the backing field directly. This lets later callers hit the cache.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void SeedCache(int entityId, EntityAlive target)
+    {
+        s_cache[entityId] = (Time.frameCount, target);
     }
 
     public static void OnEntityRemoved(int entityId) => s_cache.Remove(entityId);

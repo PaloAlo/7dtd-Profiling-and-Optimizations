@@ -1,0 +1,138 @@
+﻿// PhysicsQueryInstrumentation.cs
+//
+// Instrumentation for per-entity physics query methods to measure their
+// cumulative cost and identify optimization candidates.
+//
+// Measured methods:
+//   - EntityMoveHelper.CheckWorldBlocked  — Voxel.Raycast every 4 ticks per entity
+//   - EntityMoveHelper.CheckEntityBlocked — entity proximity checks every 4 ticks
+//   - World.GetEntitiesInBounds           — spatial query used by AI, ThreatLevel, etc.
+//   - Voxel.Raycast                       — core physics raycast
+//
+// All timing goes to ProfilerCounterBridge.RecordTiming so it appears in
+// the periodic CSV top-methods list alongside other timing entries.
+// Call counts go to PerFrameCounters for highload dump analysis.
+//
+// Guarded by ProfilerCounterBridge.IsProfilerAvailable — zero cost when
+// the profiler mod is not installed.
+
+using System.Diagnostics;
+using HarmonyLib;
+
+/// <summary>
+/// Instruments EntityMoveHelper.CheckWorldBlocked — does Voxel.Raycast calls
+/// to detect block obstructions.  Runs every 4 ticks per entity.
+/// </summary>
+[HarmonyPatch(typeof(EntityMoveHelper), "CheckWorldBlocked")]
+public static class CheckWorldBlockedInstrumentation
+{
+    [System.ThreadStatic]
+    private static long t_start;
+
+    public static void Prefix()
+    {
+        if (!ProfilerCounterBridge.IsProfilerAvailable) return;
+        t_start = Stopwatch.GetTimestamp();
+    }
+
+    public static void Postfix()
+    {
+        if (!ProfilerCounterBridge.IsProfilerAvailable) return;
+        long elapsed = Stopwatch.GetTimestamp() - t_start;
+        double ms = elapsed * 1000.0 / Stopwatch.Frequency;
+        if (ms > 0.001)
+        {
+            ProfilerCounterBridge.RecordTiming("MoveHelper.CheckWorldBlocked", ms);
+        }
+        ProfilerCounterBridge.Increment("MoveHelper.CheckWorldBlocked.calls");
+    }
+}
+
+/// <summary>
+/// Instruments EntityMoveHelper.CheckEntityBlocked — checks proximity to
+/// other entities to determine if movement is blocked.
+/// </summary>
+[HarmonyPatch(typeof(EntityMoveHelper), "CheckEntityBlocked")]
+public static class CheckEntityBlockedInstrumentation
+{
+    [System.ThreadStatic]
+    private static long t_start;
+
+    public static void Prefix()
+    {
+        if (!ProfilerCounterBridge.IsProfilerAvailable) return;
+        t_start = Stopwatch.GetTimestamp();
+    }
+
+    public static void Postfix()
+    {
+        if (!ProfilerCounterBridge.IsProfilerAvailable) return;
+        long elapsed = Stopwatch.GetTimestamp() - t_start;
+        double ms = elapsed * 1000.0 / Stopwatch.Frequency;
+        if (ms > 0.001)
+        {
+            ProfilerCounterBridge.RecordTiming("MoveHelper.CheckEntityBlocked", ms);
+        }
+        ProfilerCounterBridge.Increment("MoveHelper.CheckEntityBlocked.calls");
+    }
+}
+
+/// <summary>
+/// Instruments World.GetEntitiesInBounds — spatial entity query used by
+/// ThreatLevel, AI targeting, and other systems.  Can be expensive when
+/// iterating many chunk entities.
+/// </summary>
+[HarmonyPatch(typeof(World), "GetEntitiesInBounds")]
+public static class GetEntitiesInBoundsInstrumentation
+{
+    [System.ThreadStatic]
+    private static long t_start;
+
+    public static void Prefix()
+    {
+        if (!ProfilerCounterBridge.IsProfilerAvailable) return;
+        t_start = Stopwatch.GetTimestamp();
+    }
+
+    public static void Postfix()
+    {
+        if (!ProfilerCounterBridge.IsProfilerAvailable) return;
+        long elapsed = Stopwatch.GetTimestamp() - t_start;
+        double ms = elapsed * 1000.0 / Stopwatch.Frequency;
+        if (ms > 0.001)
+        {
+            ProfilerCounterBridge.RecordTiming("World.GetEntitiesInBounds", ms);
+        }
+        ProfilerCounterBridge.Increment("World.GetEntitiesInBounds.calls");
+    }
+}
+
+/// <summary>
+/// Instruments Voxel.Raycast — the core physics raycast used by many
+/// systems including CheckWorldBlocked, line-of-sight, and combat.
+/// High call volume expected; timing reveals if this is a real bottleneck.
+/// </summary>
+[HarmonyPatch(typeof(Voxel), "Raycast")]
+public static class VoxelRaycastInstrumentation
+{
+    [System.ThreadStatic]
+    private static long t_start;
+
+    public static void Prefix()
+    {
+        if (!ProfilerCounterBridge.IsProfilerAvailable) return;
+        t_start = Stopwatch.GetTimestamp();
+    }
+
+    public static void Postfix()
+    {
+        if (!ProfilerCounterBridge.IsProfilerAvailable) return;
+        long elapsed = Stopwatch.GetTimestamp() - t_start;
+        double ms = elapsed * 1000.0 / Stopwatch.Frequency;
+        if (ms > 0.001)
+        {
+            ProfilerCounterBridge.RecordTiming("Voxel.Raycast", ms);
+        }
+        ProfilerCounterBridge.Increment("Voxel.Raycast.calls");
+    }
+}

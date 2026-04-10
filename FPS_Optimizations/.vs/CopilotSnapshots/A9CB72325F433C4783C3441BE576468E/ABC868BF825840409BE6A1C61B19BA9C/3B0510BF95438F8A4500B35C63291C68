@@ -1,0 +1,133 @@
+﻿// UAIDecisionThrottlePatch.cs
+//
+// Throttles the UAI (Utility AI) decision-making frequency for distant zombies.
+//
+// The expensive call chain: UAIBase.Update -> chooseAction (every 0.2s)
+//   -> addEntityTargetsToConsider (GetRevengeTarget x2, GetEntitiesInBounds)
+//   -> UAIPackage.DecideAction -> UAIAction.GetScore per action x target
+//   -> UAIConsiderationPathBlocked.GetScore -> GetAttackTarget (1-4 calls)
+//
+// With 100 zombies, that's 500 full decision evaluations/sec, each with
+// spatial queries, consideration scoring, and target lookups.
+//
+// This patch skips chooseAction for distant non-combat zombies on a
+// per-entity counter basis:
+//   Critical (close/combat):  every decision runs (5/sec, unchanged)
+//   High (20-50m):            every 2nd decision (2.5/sec)
+//   Medium (50-80m):          every 3rd decision (~1.7/sec)
+//   Low (>80m):               every 5th decision (1/sec)
+//
+// updateAction still runs every frame for ALL zombies, so current tasks
+// (movement, attacks, etc.) continue smoothly.  Only the expensive
+// re-evaluation of whether a BETTER action exists is throttled.
+
+using System.Collections.Generic;
+using System.Reflection;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch]
+public static class UAIDecisionThrottlePatch
+{
+    // Per-entity decision counter for even distribution
+    private static readonly Dictionary<int, int> s_decisionCount = new Dictionary<int, int>(256);
+    private static int s_lastCleanupFrame;
+    private const int CLEANUP_INTERVAL_FRAMES = 600; // ~10s at 60fps
+
+    static MethodBase TargetMethod()
+    {
+        // UAIBase is a static class in the UAI namespace.
+        // chooseAction is the expensive decision method called every 0.2s per entity.
+        return AccessTools.Method(typeof(UAI.UAIBase), "chooseAction");
+    }
+
+    [HarmonyPrefix]
+    static bool Prefix(UAI.Context _context)
+    {
+        if (!OptimizationConfig.Current.EnableUAIDecisionThrottle) return true;
+
+        var self = _context.Self;
+        if (self == null) return true;
+        if (self is EntityPlayer) return true;
+
+        // Always allow first decision (entity needs an initial action)
+        if (_context.ActionData.Action == null) return true;
+
+        FrameCache.EnsureUpdated();
+        if (FrameCache.ShouldBypassThrottling) return true;
+
+        int entityId = self.entityId;
+
+        if (!EntityBudgetSystem.TryGetInfo(entityId, out var info))
+            return true;
+
+        // Critical tier (close/combat) always gets full decision rate
+        if (info.Tier == EntityBudgetSystem.Tier.Critical) return true;
+
+        // Entities without a target must always be allowed to evaluate.
+        // chooseAction is what GIVES them a target via addEntityTargetsToConsider
+        // and consideration scoring. Throttling targetless entities causes the
+        // chicken-and-egg problem: EntityBudgetSystem marks them non-combat
+        // because they have no target, and the throttle prevents them from
+        // acquiring one. This caused zombies to run past the player or circle
+        // before attacking.
+        if (!info.InCombat) return true;
+
+        // Determine skip interval based on tier
+        int interval;
+        switch (info.Tier)
+        {
+            case EntityBudgetSystem.Tier.High:
+                interval = 2;  // every 2nd decision = 2.5/sec
+                break;
+            case EntityBudgetSystem.Tier.Medium:
+                interval = 3;  // every 3rd decision ~ 1.7/sec
+                break;
+            case EntityBudgetSystem.Tier.Low:
+                interval = 5;  // every 5th decision = 1/sec
+                break;
+            default:
+                return true;
+        }
+
+        // Per-entity counter for even distribution
+        if (!s_decisionCount.TryGetValue(entityId, out int count))
+            count = 0;
+
+        s_decisionCount[entityId] = count + 1;
+
+        if (count % interval == 0)
+        {
+            ProfilerCounterBridge.Increment("UAI.Decision.Allowed");
+            return true;  // allow this decision
+        }
+
+        ProfilerCounterBridge.Increment("UAI.Decision.Throttled");
+        return false;  // skip chooseAction, keep current action
+    }
+
+    // Periodic cleanup of stale entity entries
+    public static void CleanupStaleEntries()
+    {
+        int frame = Time.frameCount;
+        if (frame - s_lastCleanupFrame < CLEANUP_INTERVAL_FRAMES) return;
+        s_lastCleanupFrame = frame;
+
+        var world = GameManager.Instance?.World;
+        if (world == null) return;
+
+        var stale = new List<int>();
+        foreach (var kvp in s_decisionCount)
+        {
+            if (world.GetEntity(kvp.Key) == null)
+                stale.Add(kvp.Key);
+        }
+        foreach (var id in stale)
+            s_decisionCount.Remove(id);
+    }
+
+    public static void ClearCaches()
+    {
+        s_decisionCount.Clear();
+    }
+}

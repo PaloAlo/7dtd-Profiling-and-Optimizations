@@ -70,8 +70,41 @@ public class OptimizationConfig
     // GenerateChunks, SaveChunks, WaterSimulationApplyChanges) to the .NET thread pool
     public bool EnableThreadPoolConsolidation = true;
 
+    // Throttle UAI (Utility AI) decision frequency for distant zombies.
+    // chooseAction normally runs every 0.2s (5/sec) per zombie.  With 100+
+    // zombies, this means 500+ full decision evaluations/sec, each with
+    // spatial queries, consideration scoring, and multiple GetAttackTarget
+    // calls.  This throttle reduces evaluation frequency for distant entities:
+    //   Close/combat:  5/sec (unchanged)
+    //   High (20-50m): 2.5/sec
+    //   Medium (50-80m): ~1.7/sec
+    //   Far (>80m):    1/sec
+    // Current tasks (movement, attacks) continue every frame — only the
+    // expensive "should I switch to a better action?" re-evaluation is throttled.
+    public bool EnableUAIDecisionThrottle = true;
+
+    // Particle effect throttle — reduces particle overhead during horde combat.
+    // 1. Skip redundant respawns when entity already has an active particle
+    //    of the same type (avoids GetComponentsInChildren allocs + restart).
+    // 2. Scale down emission rate & maxParticles on new spawns so the GPU
+    //    renders fewer sprites (the dominant cost for near-camera effects
+    //    like p_bleeding).
+    public bool EnableParticleThrottle = true;
+    public int ParticleThrottleZombieThreshold = 20;    // activate at 20+ zombies
+    public int ParticleThrottleMinGapFrames = 480;      // ~8 sec at 60 fps between respawns
+    public float ParticleEmissionScaleMin = 0.35f;      // 35% emission at 2× threshold
+
+    // Threat-level music throttle — reduces frequency of
+    // DynamicMusic.ThreatLevelUtility.GetThreatLevelOn which scans all
+    // nearby entities every frame (GetEntitiesInBounds + 2 list iterations
+    // + sleeper-volume scan).  The result already feeds a Queue-based
+    // rolling average so skipping frames is invisible to the music system.
+    public bool EnableThreatLevelThrottle = true;
+    public int ThreatLevelThrottleZombieThreshold = 15; // activate at 15+ zombies
+    public int ThreatLevelThrottleFrames = 30;          // ~0.5 sec at 60 fps
+
     public const string ConfigFileName = "fps_optimization_config.json";
-    private const int ConfigVersion = 8;
+    private const int ConfigVersion = 11;
     public int Version = ConfigVersion;
 
     public static OptimizationConfig Current { get; private set; } = new OptimizationConfig();
@@ -225,6 +258,17 @@ public class OptimizationConfig
 
                 // Thread pool consolidation doesn't have a runtime cache to clear,
                 // but we report the change.
+
+                // UAI decision throttle
+                ["EnableUAIDecisionThrottle"] = () => { UAIDecisionThrottlePatch.ClearCaches(); },
+
+                // Particle effect throttle
+                ["EnableParticleThrottle"] = () => { ParticleEffectThrottlePatch.ClearCaches(); },
+
+                // Threat-level music throttle
+                ["EnableThreatLevelThrottle"] = () => { ThreatLevelThrottlePatch.ClearCaches(); },
+                ["ThreatLevelThrottleFrames"] = () => { ThreatLevelThrottlePatch.ClearCaches(); },
+                ["ThreatLevelThrottleZombieThreshold"] = () => { ThreatLevelThrottlePatch.ClearCaches(); },
             };
 
             // Always clear the budget system if any distance thresholds changed
