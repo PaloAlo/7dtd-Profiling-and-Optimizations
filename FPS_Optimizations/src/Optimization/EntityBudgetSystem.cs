@@ -41,8 +41,9 @@ public static class EntityBudgetSystem
     {
         public Tier Tier;
         public float DistanceSq;
-        public bool InCombat;
-        public int FrameSlot;       // Pre-computed round-robin slot for this entity
+        public bool InCombat;           // Any combat flag (attack/revenge/recently attacked/alert/investigating)
+        public bool InActiveCombat;     // Has actual target or was recently attacked (attack/revenge/recentlyAttacked)
+        public int FrameSlot;           // Pre-computed round-robin slot for this entity
     }
 
     // Lookup table: entityId -> classification
@@ -93,6 +94,20 @@ public static class EntityBudgetSystem
         var entities = world.Entities.list;
         int graceCount = 0;
 
+        // Combat reason breakdown counters
+        int combatTotal = 0;
+        int combatAttackTarget = 0;
+        int combatRevengeTarget = 0;
+        int combatRecentlyAttacked = 0;
+        int combatAlert = 0;
+        int combatInvestigating = 0;
+        // Critical tier sub-reason counters
+        int criticalClose = 0;
+        int criticalCombat = 0;
+        int awareDemotedCount = 0;
+
+        var cfg = OptimizationConfig.Current;
+
         for (int i = 0; i < entities.Count; i++)
         {
             var entity = entities[i] as EntityAlive;
@@ -129,16 +144,45 @@ public static class EntityBudgetSystem
                 GetAttackTargetCachePatch.SeedCache(entityId, attackTgt);
                 GetRevengeTargetCachePatch.SeedCache(entityId, revengeTgt);
             }
-            bool inCombat = attackTgt != null
-                         || revengeTgt != null
-                         || entity.hasBeenAttackedTime > 0
-                         || entity.isAlert
-                         || entity.HasInvestigatePosition;
+
+            bool hasAttackTarget = attackTgt != null;
+            bool hasRevengeTarget = revengeTgt != null;
+            bool recentlyAttacked = entity.hasBeenAttackedTime > 0;
+            bool isAlert = entity.isAlert;
+            bool isInvestigating = entity.HasInvestigatePosition;
+
+            bool inCombat = hasAttackTarget
+                         || hasRevengeTarget
+                         || recentlyAttacked
+                         || isAlert
+                         || isInvestigating;
+
+            // Active combat = has an actual target or was recently attacked.
+            // Aware-only = alert/investigating but no target yet.
+            bool inActiveCombat = hasAttackTarget || hasRevengeTarget || recentlyAttacked;
+
+            // When sub-classification is enabled, only active combat triggers
+            // Critical tier from combat.  Aware-only entities (just alert/
+            // investigating) get demoted to High for mild throttling under load.
+            bool combatForTier = cfg.EnableCombatSubClassification
+                ? inActiveCombat
+                : inCombat;
+
+            // Accumulate per-flag combat reason counts
+            if (inCombat)
+            {
+                combatTotal++;
+                if (hasAttackTarget) combatAttackTarget++;
+                if (hasRevengeTarget) combatRevengeTarget++;
+                if (recentlyAttacked) combatRecentlyAttacked++;
+                if (isAlert) combatAlert++;
+                if (isInvestigating) combatInvestigating++;
+            }
 
             Tier tier;
-            if (inGracePeriod || distSq < CLOSE_DIST_SQ || inCombat)
+            if (inGracePeriod || distSq < CLOSE_DIST_SQ || combatForTier)
             {
-                if (IsSurge && !inCombat)
+                if (IsSurge && !combatForTier)
                 {
                     // Surge: proximity-only entities demoted to High to stagger
                     // mass sleeper awakening processing across frames
@@ -149,7 +193,21 @@ public static class EntityBudgetSystem
                 {
                     tier = Tier.Critical;
                     CriticalCount++;
+
+                    // Track why this entity is Critical
+                    if (inActiveCombat) criticalCombat++;
+                    else criticalClose++;
                 }
+            }
+            else if (inCombat)
+            {
+                // Aware-only: alert/investigating without actual target, beyond
+                // close range.  Demoted from Critical to High so mild throttling
+                // can apply under load.  Full updates at low zombie counts;
+                // skip-interval kicks in at emergency threshold.
+                tier = Tier.High;
+                HighCount++;
+                awareDemotedCount++;
             }
             else if (distSq < MID_DIST_SQ)
             {
@@ -176,6 +234,7 @@ public static class EntityBudgetSystem
                 Tier = tier,
                 DistanceSq = distSq,
                 InCombat = inCombat,
+                InActiveCombat = inActiveCombat,
                 FrameSlot = frameSlot
             };
         }
@@ -199,6 +258,24 @@ public static class EntityBudgetSystem
         {
             ProfilerCounterBridge.Increment("Budget.Grace", graceCount);
         }
+
+        // Report combat reason breakdown (flags can overlap per entity)
+        if (combatTotal > 0)
+        {
+            ProfilerCounterBridge.Increment("Combat.Total", combatTotal);
+            if (combatAttackTarget > 0) ProfilerCounterBridge.Increment("Combat.AttackTarget", combatAttackTarget);
+            if (combatRevengeTarget > 0) ProfilerCounterBridge.Increment("Combat.RevengeTarget", combatRevengeTarget);
+            if (combatRecentlyAttacked > 0) ProfilerCounterBridge.Increment("Combat.RecentlyAttacked", combatRecentlyAttacked);
+            if (combatAlert > 0) ProfilerCounterBridge.Increment("Combat.Alert", combatAlert);
+            if (combatInvestigating > 0) ProfilerCounterBridge.Increment("Combat.Investigating", combatInvestigating);
+        }
+
+        // Report Critical tier sub-reasons
+        if (criticalClose > 0) ProfilerCounterBridge.Increment("Critical.Close", criticalClose);
+        if (criticalCombat > 0) ProfilerCounterBridge.Increment("Critical.Combat", criticalCombat);
+
+        // Report aware-only entities demoted from Critical to High
+        if (awareDemotedCount > 0) ProfilerCounterBridge.Increment("Budget.AwareDemoted", awareDemotedCount);
     }
 
     /// <summary>

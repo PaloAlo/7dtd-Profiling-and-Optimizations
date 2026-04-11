@@ -13,4 +13,8 @@
 	  <Compile Remove="src\Optimization\PrefabLODInstrumentation.cs" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="FPS_Optimizations\src\Optimization\" />
+	</ItemGroup>
+
 </Project>

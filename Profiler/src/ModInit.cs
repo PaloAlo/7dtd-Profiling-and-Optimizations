@@ -24,6 +24,9 @@ public class ModInit : IModApi
         var harmony = new Harmony("com.PaLoALo.profiler.7dtd");
         harmony.PatchAll(Assembly.GetExecutingAssembly());
 
+        // Deferred patches for overloaded methods (can't use attribute-based patching)
+        PhysicsQueryDeferredPatches.Apply(harmony);
+
         Log.Out($"Profiler loaded. Profiling={ProfilerConfig.Current.EnableProfiling}");
     }
 }

@@ -35,6 +35,9 @@ public class ProfilerRunner : MonoBehaviour
     public float CaptureDebounceSeconds = 30f;
     public int MaxHighLoadCaptures = 5;
 
+    // --- New: require low-FPS to be sustained before capturing (avoids single-frame spikes)
+    public float LowFpsSustainSeconds = 3f;
+
     // === RECOVERY TRACKING ===
     public float RecoveryCheckIntervalSeconds = 60f;
     public float RecoveryFpsThreshold = 0.8f;
@@ -52,6 +55,9 @@ public class ProfilerRunner : MonoBehaviour
     private bool _baselineEstablished = false;
     private readonly Queue<float> _fpsHistory = new Queue<float>();
     private const int FpsHistorySize = 60;
+
+    // New: sustained-low-FPS tracking
+    private float _lowFpsStartTime = -1f;
 
     // Recovery analysis
     private int _peakZombieCount = 0;
@@ -253,6 +259,13 @@ public class ProfilerRunner : MonoBehaviour
 
     private void CheckHighLoadCapture()
     {
+        // Require baseline and a local player before considering captures.
+        if (!_baselineEstablished || !IsPlayerPresent()) 
+        {
+            _lowFpsStartTime = -1f; // reset sustain timer while not ready
+            return;
+        }
+
         if (_highLoadCaptureCount >= MaxHighLoadCaptures) return;
 
         var timeSinceLastCapture = Time.realtimeSinceStartup - _lastHighLoadCaptureTime;
@@ -261,23 +274,37 @@ public class ProfilerRunner : MonoBehaviour
         var zombieCount = FindZombieCount();
         var currentFps = _fpsHistory.Count > 0 ? _fpsHistory.Average() : 60f;
 
-        // FPS-based triggers fire regardless of zombie count — a significant
-        // drop or absolute low FPS is worth capturing even with few zombies.
+        // FPS-based triggers fire regardless of zombie count — but require sustain
         var fpsDroppedSignificantly = _baselineEstablished && currentFps < _baselineFps * 0.5f;
         var fpsBelowThreshold = currentFps < LowFpsThreshold;
 
+        bool triggerCandidate = fpsBelowThreshold || fpsDroppedSignificantly || zombieCount >= MinZombiesForCapture;
+
+        if (!triggerCandidate)
+        {
+            _lowFpsStartTime = -1f;
+            return;
+        }
+
+        // If the candidate reason is purely FPS-related, require it to be sustained
+        if (fpsBelowThreshold || fpsDroppedSignificantly)
+        {
+            if (_lowFpsStartTime < 0f)
+                _lowFpsStartTime = Time.realtimeSinceStartup;
+
+            var sustained = Time.realtimeSinceStartup - _lowFpsStartTime >= LowFpsSustainSeconds;
+            if (!sustained) return;
+        }
+
+        // If candidate triggered by zombie count (stable condition), allow immediate capture
+        _lowFpsStartTime = -1f;
+
         if (fpsBelowThreshold)
-        {
             CaptureHighLoadDump(zombieCount, currentFps, "LOW_FPS");
-        }
         else if (fpsDroppedSignificantly)
-        {
             CaptureHighLoadDump(zombieCount, currentFps, "FPS_DROP");
-        }
-        else if (zombieCount >= MinZombiesForCapture)
-        {
+        else // zombieCount >= MinZombiesForCapture
             CaptureHighLoadDump(zombieCount, currentFps, "HIGH_ZOMBIE_COUNT");
-        }
     }
 
     private void CaptureHighLoadDump(int zombieCount, float currentFps, string triggerReason)
@@ -426,6 +453,19 @@ public class ProfilerRunner : MonoBehaviour
 
     private void DumpRow()
     {
+        // Avoid writing periodic CSV rows until baseline + player present are established.
+        if (!_baselineEstablished || !IsPlayerPresent())
+        {
+            // Clear collected profiling state so we don't accumulate noisy data while loading.
+            try
+            {
+                ProfilingUtils.Clear();
+                ProfilingUtils.PerFrameCounters.ResetAll();
+            }
+            catch { }
+            return;
+        }
+
         var entries = ProfilingUtils.SnapshotEntries();
         var counters = ProfilingUtils.PerFrameCounters.SnapshotAndReset();
 
@@ -530,5 +570,36 @@ public class ProfilerRunner : MonoBehaviour
             return count;
         }
         catch { return 0; }
+    }
+
+    // Helper: determine if a local player entity is present (used to avoid captures during loading/login)
+    public bool IsPlayerPresent()
+    {
+        try
+        {
+            var gm = GameManager.Instance;
+            if (gm?.World == null) return false;
+
+            var entities = gm.World.Entities;
+            if (entities == null) return false;
+
+            var list = entities.list;
+            if (list == null) return false;
+
+            for (int i = 0; i < list.Count; i++)
+            {
+                var e = list[i];
+                if (e != null && e is EntityPlayerLocal)
+                    return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    // Public helper used by instrumentation to decide whether heavy diagnostics are allowed.
+    public static bool DiagnosticsReady()
+    {
+        return Instance != null && Instance._baselineEstablished && Instance.IsPlayerPresent();
     }
 }

@@ -84,6 +84,11 @@ public static class FrameCache
         }
         ZombieCount = zombieCount;
 
+        // Update adaptive thresholds based on current FPS + load.
+        // Uses unscaledDeltaTime so time-scale changes don't skew the estimate.
+        float currentFps = (Time.unscaledDeltaTime > 0f) ? (1f / Time.unscaledDeltaTime) : 60f;
+        AdaptiveThresholds.Update(currentFps, zombieCount);
+
         // Classify all entities into budget tiers (once per frame)
         if (HasPlayer)
         {

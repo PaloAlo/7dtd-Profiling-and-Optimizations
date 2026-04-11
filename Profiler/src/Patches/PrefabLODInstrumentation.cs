@@ -18,19 +18,29 @@ public static class PrefabLODInstrumentation
 
     public static void Prefix()
     {
-        if (!ProfilerCounterBridge.IsProfilerAvailable) return;
-        ProfilerCounterBridge.Increment("PrefabLOD.FrameUpdate.calls");
-        t_startTimestamp = Stopwatch.GetTimestamp();
+        // Feature-guard so this is effectively zero-cost when disabled
+        if (ProfilerConfig.Current == null || !ProfilerConfig.Current.EnableDeepPhysicsInstrumentation)
+        {
+            t_startTimestamp = 0;
+            return;
+        }
+
+        // Count the call (aggregates for high-load dumps)
+        ProfilingUtils.PerFrameCounters.Increment("PrefabLOD.FrameUpdate.calls");
+
+        // Start the profiler sample (no allocations)
+        t_startTimestamp = ProfilingUtils.BeginSample();
     }
 
     public static void Postfix()
     {
-        if (!ProfilerCounterBridge.IsProfilerAvailable) return;
-        long elapsed = Stopwatch.GetTimestamp() - t_startTimestamp;
-        double ms = elapsed * 1000.0 / Stopwatch.Frequency;
-        if (ms > 0.001)
-        {
-            ProfilerCounterBridge.RecordTiming("PrefabLOD.FrameUpdate", ms);
-        }
+        if (ProfilerConfig.Current == null || !ProfilerConfig.Current.EnableDeepPhysicsInstrumentation) return;
+        if (t_startTimestamp == 0) return;
+
+        // Finish the sample and record the timing under a descriptive tag
+        ProfilingUtils.EndSample("PrefabLOD.FrameUpdate", t_startTimestamp);
+
+        // Clear thread-local state
+        t_startTimestamp = 0;
     }
 }

@@ -14,12 +14,14 @@
 //
 // This is zero-overhead when disabled (config flag).  When enabled, the overhead
 // is one thread-local read/write per call — sub-microsecond.
+//
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Diagnostics;
+using System.IO;
 using HarmonyLib;
 using UnityEngine;
 
@@ -34,7 +36,7 @@ public static class CallChainInstrumentation
     [ThreadStatic] private static int t_depth;
 
     /// <summary>
-    /// Get the current caller tag.  Returns "Unknown" if no caller patch is active.
+    /// Get the current caller tag.  Returns "Direct/Unknown" if no caller patch is active.
     /// </summary>
     public static string CurrentCallerTag => t_callerTag ?? "Direct/Unknown";
 
@@ -94,9 +96,7 @@ public static class CallChainInstrumentation
             ("EntityAlive", "MoveEntityHeaded", "MoveEntityHeaded"),
             ("EntityAlive", "OnUpdateLive", "OnUpdateLive"),  // capital O — confirmed via reflection
 
-            // AI task system — CanExecute checks targets, Update runs executing tasks
-            // Note: there is no Execute() method in 7DTD's EAI — the method is Update()
-            // Note: EAIFollowTarget does not exist in this game version
+            // AI task system
             ("EAIManager", "Update", "EAIManager.Update"),
             ("EAISetNearestEntityAsTarget", "CanExecute", "EAI.SetNearest.CanExec"),
             ("EAISetNearestEntityAsTarget", "Update", "EAI.SetNearest.Update"),
@@ -136,16 +136,7 @@ public static class CallChainInstrumentation
         {
             try
             {
-                var type = asm.GetType(typeName);
-                if (type == null)
-                {
-                    // Try short-name lookup
-                    try
-                    {
-                        type = asm.GetTypes().FirstOrDefault(t => t.Name == typeName);
-                    }
-                    catch { }
-                }
+                var type = asm.GetType(typeName) ?? asm.GetTypes().FirstOrDefault(t => t.Name == typeName);
                 if (type == null)
                 {
                     LogUtil.Debug($"Type not found: {typeName}");
@@ -247,7 +238,9 @@ public static class CallChainInstrumentation
     private static int s_directLastFrame = -1;
     private static readonly Dictionary<string, int> s_directCounts = new Dictionary<string, int>(16);
     private static readonly HashSet<string> s_directTriggered = new HashSet<string>(16);
+    private static readonly Dictionary<string, int> s_directStreaks = new Dictionary<string, int>(16);
     private const int DIRECT_UNKNOWN_THRESHOLD = 25; // per-target-method per-frame
+    private const int DIRECT_UNKNOWN_FRAME_STREAK = 3; // require repeated frames before heavy diagnostic
 
     // --- Caller site prefix/postfix ---
     // These wrap every known caller to set the thread-local tag.
@@ -278,7 +271,6 @@ public static class CallChainInstrumentation
 
     // --- Target method (GetAttackTarget / GetRevengeTarget) prefix ---
     // Records the current caller tag as a counter.
-
     public static void TargetCallPrefix(MethodBase __originalMethod)
     {
         if (!ProfilerConfig.Current.EnableCallChainInstrumentation) return;
@@ -297,29 +289,101 @@ public static class CallChainInstrumentation
                     int frame = Time.frameCount;
                     if (frame != s_directLastFrame)
                     {
+                        // New frame: rotate counters and reset per-frame structures
                         s_directLastFrame = frame;
                         s_directCounts.Clear();
-                        s_directTriggered.Clear();
+                        // streaks are preserved across frames — they are only reset per-method below
+                        // triggered set remains (we don't want duplicate heavy diagnostics)
                     }
 
                     if (!s_directCounts.TryGetValue(methodName, out int cnt)) cnt = 0;
                     cnt++;
                     s_directCounts[methodName] = cnt;
 
+                    // Update frame streaks: increment if this frame exceeded threshold, reset otherwise
+                    if (!s_directStreaks.TryGetValue(methodName, out int streak)) streak = 0;
+                    if (cnt >= DIRECT_UNKNOWN_THRESHOLD)
+                        streak++;
+                    else
+                        streak = 0;
+                    s_directStreaks[methodName] = streak;
+
+                    // Only consider emitting once we have a multi-frame streak and we haven't emitted before
                     if (cnt >= DIRECT_UNKNOWN_THRESHOLD && !s_directTriggered.Contains(methodName))
                     {
-                        s_directTriggered.Add(methodName);
-                        try
+                        if (s_directStreaks.TryGetValue(methodName, out int currentStreak) && currentStreak >= DIRECT_UNKNOWN_FRAME_STREAK)
                         {
-                            // Capture a lightweight stack trace and log it for diagnostics.
-                            var st = new StackTrace(2, false); // skip frames for the instrumentation
-                            LogUtil.Warn($"CallChain: many Direct/Unknown calls for {methodName} — stack trace (single-shot): {st}");
+                            try
+                            {
+                                // Instead of spamming the main log, do a bounded stack-walk to infer a caller tag
+                                var st = new StackTrace(2, false); // skip instrumentation frames
+                                var inferred = InferCallerTag(st);
+
+                                // Attribute the observed counts to the inferred tag so CSVs will show it
+                                if (!string.IsNullOrEmpty(inferred) && inferred != "Direct/Unknown")
+                                {
+                                    // Add the accumulated count observed this frame to the inferred counter
+                                    ProfilingUtils.PerFrameCounters.Increment($"CallChain.{methodName}.from.{inferred}", cnt);
+                                }
+
+                                // Mark triggered so we don't repeat heavy work for the same method repeatedly
+                                s_directTriggered.Add(methodName);
+
+                                // If the user explicitly requested stack-trace diagnostics, write the full stack trace to a separate debug file
+                                if (ProfilerConfig.Current.EnableStackTraceDiagnostics && ProfilerRunner.DiagnosticsReady())
+                                {
+                                    try
+                                    {
+                                        var path = ProfilingUtils.ResolveOutputPath($"callchain_debug_{DateTime.UtcNow:yyyyMMdd_HHmmss}.log");
+                                        var sb = new System.Text.StringBuilder();
+                                        sb.AppendLine($"--- CallChain debug for {methodName} at frame {frame} (inferred: {inferred}) ---");
+                                        sb.AppendLine(st.ToString());
+                                        sb.AppendLine();
+                                        File.AppendAllText(path, sb.ToString());
+                                    }
+                                    catch { /* swallow file errors — diagnostics must never throw */ }
+                                }
+                            }
+                            catch { /* ignore and continue — diagnostics must not affect game logic */ }
                         }
-                        catch { }
                     }
                 }
             }
         }
         catch { }
+    }
+
+    // Infer a brief caller tag from a StackTrace by finding the first non-instrumentation frame.
+    // Bounded, conservative, and low-overhead because it's executed rarely (only on a detection event).
+    private static string InferCallerTag(StackTrace st)
+    {
+        try
+        {
+            var frames = st.GetFrames();
+            if (frames == null || frames.Length == 0) return "Direct/Unknown";
+
+            foreach (var f in frames)
+            {
+                var m = f.GetMethod();
+                if (m == null) continue;
+                var dt = m.DeclaringType;
+                if (dt == null) continue;
+
+                var fullTypeName = dt.FullName ?? dt.Name;
+
+                // Skip instrumentation/internal/system/mono-mod frames
+                if (fullTypeName.Contains("CallChainInstrumentation")) continue;
+                if (fullTypeName.Contains("ProfilingUtils")) continue;
+                if (fullTypeName.Contains("ProfilerRunner")) continue;
+                if (fullTypeName.Contains("MonoMod.Utils")) continue;
+                if (fullTypeName.StartsWith("System.") || fullTypeName.StartsWith("Microsoft.") || fullTypeName.StartsWith("UnityEngine.")) continue;
+                if (fullTypeName.Contains("Harmony")) continue;
+
+                // Return a compact inferred tag: TypeName.MethodName (prefer type short name)
+                return $"{dt.Name}.{m.Name}";
+            }
+        }
+        catch { }
+        return "Direct/Unknown";
     }
 }

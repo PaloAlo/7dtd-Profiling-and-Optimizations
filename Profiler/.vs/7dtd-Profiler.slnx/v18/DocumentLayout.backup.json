@@ -9,6 +9,18 @@
     {
       "AbsoluteMoniker": "D:0:0:{15A62354-3EA6-C78F-6C53-FEC1272F0862}|Profiler.csproj|e:\\github\\7dtd\\my_mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\profiler\\src\\patches\\callchaininstrumentation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{15A62354-3EA6-C78F-6C53-FEC1272F0862}|Profiler.csproj|solutionrelative:src\\patches\\callchaininstrumentation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{15A62354-3EA6-C78F-6C53-FEC1272F0862}|Profiler.csproj|e:\\github\\7dtd\\my_mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\profiler\\src\\patches\\physicsqueryinstrumentation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{15A62354-3EA6-C78F-6C53-FEC1272F0862}|Profiler.csproj|solutionrelative:src\\patches\\physicsqueryinstrumentation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{15A62354-3EA6-C78F-6C53-FEC1272F0862}|Profiler.csproj|e:\\github\\7dtd\\my_mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\profiler\\src\\patches\\prefablodinstrumentation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{15A62354-3EA6-C78F-6C53-FEC1272F0862}|Profiler.csproj|solutionrelative:src\\patches\\prefablodinstrumentation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{15A62354-3EA6-C78F-6C53-FEC1272F0862}|Profiler.csproj|e:\\github\\7dtd\\my_mods\\7dtd-visual-studio-csharp-mods\\7dtd-profiling-and-optimizations\\profiler\\src\\profiling\\profilerconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{15A62354-3EA6-C78F-6C53-FEC1272F0862}|Profiler.csproj|solutionrelative:src\\profiling\\profilerconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -18,11 +30,50 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 5,
           "Children": [
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{40ea2e6b-2121-4bb8-a43e-c83c04b51041}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "ProfilerConfig.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\src\\Profiling\\ProfilerConfig.cs",
+              "RelativeDocumentMoniker": "src\\Profiling\\ProfilerConfig.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\src\\Profiling\\ProfilerConfig.cs",
+              "RelativeToolTip": "src\\Profiling\\ProfilerConfig.cs",
+              "ViewState": "AgIAAF8AAAAAAAAAAIAwwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-10T17:00:53.147Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "PrefabLODInstrumentation.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\src\\Patches\\PrefabLODInstrumentation.cs",
+              "RelativeDocumentMoniker": "src\\Patches\\PrefabLODInstrumentation.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\src\\Patches\\PrefabLODInstrumentation.cs",
+              "RelativeToolTip": "src\\Patches\\PrefabLODInstrumentation.cs",
+              "ViewState": "AgIAAAMAAAAAAAAAAAAAACEAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-10T16:29:13.602Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "PhysicsQueryInstrumentation.cs",
+              "DocumentMoniker": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\src\\Patches\\PhysicsQueryInstrumentation.cs",
+              "RelativeDocumentMoniker": "src\\Patches\\PhysicsQueryInstrumentation.cs",
+              "ToolTip": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\src\\Patches\\PhysicsQueryInstrumentation.cs",
+              "RelativeToolTip": "src\\Patches\\PhysicsQueryInstrumentation.cs",
+              "ViewState": "AgIAAKwAAAAAAAAAAAAQwL4AAACDAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-10T16:03:01.986Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -32,7 +83,7 @@
               "RelativeDocumentMoniker": "src\\Patches\\CallChainInstrumentation.cs",
               "ToolTip": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\src\\Patches\\CallChainInstrumentation.cs",
               "RelativeToolTip": "src\\Patches\\CallChainInstrumentation.cs",
-              "ViewState": "AgIAABcBAAAAAAAAAAAAAAAAAAAeAAAAAAAAAA==",
+              "ViewState": "AgIAAF0BAAAAAAAAAAArwBMAAAAhAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-04-10T02:41:01.013Z",
               "EditorCaption": ""
@@ -45,7 +96,7 @@
               "RelativeDocumentMoniker": "src\\Profiling\\ProfilerRunner.cs",
               "ToolTip": "E:\\GitHub\\7dtd\\my_mods\\7dtd-Visual-Studio-CSharp-mods\\7dtd-Profiling-and-Optimizations\\Profiler\\src\\Profiling\\ProfilerRunner.cs",
               "RelativeToolTip": "src\\Profiling\\ProfilerRunner.cs",
-              "ViewState": "AgIAAD4AAAAAAAAAAAAuwEkAAAAXAAAAAAAAAA==",
+              "ViewState": "AgIAAEQCAAAAAAAAAAAAAAMBAAAnAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-04-10T02:40:57.406Z",
               "EditorCaption": ""

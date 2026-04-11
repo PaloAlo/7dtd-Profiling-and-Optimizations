@@ -45,7 +45,7 @@ public static class MoveHelperThrottlePatch
             if (!EntityBudgetSystem.TryGetInfo(entityId, out var budgetInfo))
                 return true;
 
-            // Combat-engaged entities always get full obstacle avoidance
+            // Combat entities always get full obstacle avoidance.
             if (budgetInfo.InCombat) return true;
 
             int currentFrame = Time.frameCount;

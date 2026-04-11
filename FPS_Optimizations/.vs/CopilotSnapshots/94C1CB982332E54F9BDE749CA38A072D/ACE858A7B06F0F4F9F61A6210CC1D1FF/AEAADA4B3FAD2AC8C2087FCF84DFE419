@@ -1,0 +1,107 @@
+﻿// CheckWorldBlockedCachePatch.cs
+//
+// Spatial deduplication cache for EntityMoveHelper.CheckWorldBlocked.
+//
+// During horde attacks, many zombies converge on the same area heading toward
+// the player.  Their CheckWorldBlocked voxel raycasts traverse the same world
+// geometry and produce the same "not blocked" result.  This patch caches
+// "path clear" results per discretized grid cell + target direction and shares
+// them across entities in the same area within the same frame.
+//
+// Only "not blocked" results are cached.  "Blocked" results include position-
+// specific HitInfo details that can't be shared safely.
+//
+// Runs at Priority.First so it short-circuits before both Zehmatt's voxel
+// pre-filter and the vanilla physics-based check, avoiding ALL raycast work
+// for cache hits.
+
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntityMoveHelper), nameof(EntityMoveHelper.CheckWorldBlocked))]
+public static class CheckWorldBlockedCachePatch
+{
+    // Spatial key → sentinel byte.  Presence in the dictionary means
+    // "path clear" was confirmed for this grid cell + direction this frame.
+    private static readonly Dictionary<long, byte> s_clearCache = new Dictionary<long, byte>(64);
+    private static int s_cacheFrame = -1;
+
+    [HarmonyPriority(Priority.First)]
+    public static bool Prefix(EntityMoveHelper __instance, ref int ___BlockedFlags)
+    {
+        if (!OptimizationConfig.Current.EnableObstacleSpatialCache) return true;
+
+        FrameCache.EnsureUpdated();
+        if (FrameCache.ShouldBypassThrottling) return true;
+
+        int frame = Time.frameCount;
+        if (frame != s_cacheFrame)
+        {
+            s_clearCache.Clear();
+            s_cacheFrame = frame;
+        }
+
+        long key = ComputeSpatialKey(__instance);
+        if (s_clearCache.ContainsKey(key))
+        {
+            // Another entity in the same grid cell heading the same direction
+            // confirmed the path is clear this frame.  Skip all obstacle
+            // checking (Zehmatt's voxel pre-filter + vanilla physics).
+            ___BlockedFlags &= ~1;
+            ProfilerCounterBridge.Increment("WorldBlocked.SpatialHit");
+            return false;
+        }
+
+        return true;
+    }
+
+    public static void Postfix(EntityMoveHelper __instance, int ___BlockedFlags)
+    {
+        if (!OptimizationConfig.Current.EnableObstacleSpatialCache) return;
+
+        // Only cache "not blocked" results (bit 0 clear).
+        // Blocked results include HitInfo with position-specific data
+        // that can't be safely shared across entities.
+        if ((___BlockedFlags & 1) == 0)
+        {
+            long key = ComputeSpatialKey(__instance);
+            s_clearCache[key] = 0;
+        }
+    }
+
+    /// <summary>
+    /// Compute a spatial hash that groups entities by position + heading.
+    /// Start position discretized to 2m grid; target position to 4m grid.
+    /// Entities in the same grid cell heading to the same target area see
+    /// the same voxel world geometry and get shared results.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static long ComputeSpatialKey(EntityMoveHelper helper)
+    {
+        Vector3 pos = helper.entity.position;
+        Vector3 tgt = helper.moveToPos;
+
+        // 2m grid for start position (XYZ)
+        int sx = (int)Mathf.Floor(pos.x * 0.5f);
+        int sy = (int)Mathf.Floor(pos.y * 0.5f);
+        int sz = (int)Mathf.Floor(pos.z * 0.5f);
+        // 4m grid for target position (XZ only — Y doesn't affect horizontal raycast)
+        int tx = (int)Mathf.Floor(tgt.x * 0.25f);
+        int tz = (int)Mathf.Floor(tgt.z * 0.25f);
+
+        // Pack into long: sx(12) | sy(8) | sz(12) | tx(16) | tz(16)
+        return ((long)(sx & 0xFFF) << 52) |
+               ((long)(sy & 0xFF) << 44) |
+               ((long)(sz & 0xFFF) << 32) |
+               ((long)(tx & 0xFFFF) << 16) |
+               (long)(tz & 0xFFFF);
+    }
+
+    public static void ClearCaches()
+    {
+        s_clearCache.Clear();
+        s_cacheFrame = -1;
+    }
+}

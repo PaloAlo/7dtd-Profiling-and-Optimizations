@@ -8,3 +8,6 @@ E:\GitHub\7dtd\my_mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimiz
 E:\GitHub\7dtd\my_mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\Profiler\obj\Debug\Profiler.GeneratedMSBuildEditorConfig.editorconfig
 E:\GitHub\7dtd\my_mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\Profiler\obj\Debug\Profiler.csproj.CoreCompileInputs.cache
 E:\GitHub\7dtd\my_mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\Profiler\obj\Debug\Profiler.dll
+E:\GitHub\7dtd\my_mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\Profiler\obj\Debug\Profiler.sourcelink.json
+E:\GitHub\7dtd\my_mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\Profiler\bin\Debug\Profiler.pdb
+E:\GitHub\7dtd\my_mods\7dtd-Visual-Studio-CSharp-mods\7dtd-Profiling-and-Optimizations\Profiler\obj\Debug\Profiler.pdb

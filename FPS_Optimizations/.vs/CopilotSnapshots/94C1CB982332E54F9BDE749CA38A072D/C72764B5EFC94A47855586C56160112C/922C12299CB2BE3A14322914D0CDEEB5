@@ -1,0 +1,175 @@
+﻿// DefaultMoveEntityLODPatch.cs
+//
+// Reduces CharacterController.Move() frequency for non-Critical entities.
+//
+// DefaultMoveEntity is the inner physics step called by MoveEntityHeaded.
+// It applies friction + gravity to entity.motion, then calls
+// entityCollision(motion) which runs CharacterController.Move() — the
+// single most expensive per-entity call in the engine pipeline.
+//
+// BUG THIS FIXES: The existing EntityCollisionThrottlePatch was completely
+// ineffective because it used the same ShouldRunThisFrame + interval as
+// MoveEntityHeadedLODPatch.  Any entity that MoveEntityHeaded decided to
+// run also passed the collision throttle — they could never disagree.
+//
+// This patch uses its OWN more aggressive intervals so that some frames
+// where MoveEntityHeaded runs full, DefaultMoveEntity runs "lite" —
+// applying friction + gravity + horizontal extrapolation while skipping
+// the expensive CharacterController.Move().
+//
+// Creates a two-tier physics LOD:
+//   1. MoveEntityHeaded LOD: very far → full LiteMotion (skip everything)
+//   2. DefaultMoveEntity LOD: mid-range → lite physics (skip collision,
+//      friction+gravity only, entity holds position until next full frame)
+//   3. Close / combat (Critical tier) → full physics every frame
+//
+// SAFETY:
+//   - Only applies to non-Critical, grounded entities (never airborne)
+//   - Horizontal-only extrapolation (Y never modified — prevents clipping)
+//   - Friction + gravity still applied to motion vector (keeps it correct
+//     for the next full-physics frame)
+//   - Minimum 20 zombies required to activate
+
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntityAlive), "DefaultMoveEntity")]
+public static class DefaultMoveEntityLODPatch
+{
+    private const int MIN_ZOMBIE_THRESHOLD = 20;
+
+    public static bool Prefix(EntityAlive __instance)
+    {
+        if (!OptimizationConfig.Current.EnableMoveLOD) return true;
+        if (__instance == null) return true;
+        if (__instance is EntityPlayer) return true;
+
+        FrameCache.EnsureUpdated();
+        if (FrameCache.ShouldBypassThrottling) return true;
+
+        try
+        {
+            if (__instance.IsSleeping) return true;
+
+            int zombieCount = FrameCache.ZombieCount;
+            if (zombieCount < MIN_ZOMBIE_THRESHOLD) return true;
+
+            int entityId = __instance.entityId;
+            if (!EntityBudgetSystem.TryGetInfo(entityId, out var budgetInfo))
+                return true;
+
+            // Critical tier = close or combat → always full physics
+            if (budgetInfo.Tier == EntityBudgetSystem.Tier.Critical) return true;
+
+            // Never throttle airborne entities — gravity + landing needs
+            // full CharacterController collision to avoid clipping
+            if (!__instance.onGround && !__instance.isSwimming) return true;
+
+            // Independent interval — more aggressive than MoveEntityHeaded's
+            // global recommended interval so this fires on frames where
+            // MoveEntityHeaded runs but full physics isn't essential.
+            int interval = GetPhysicsInterval(budgetInfo.Tier, zombieCount);
+            if (interval <= 1) return true;
+
+            if (EntityBudgetSystem.ShouldRunThisFrame(entityId, interval))
+                return true;
+
+            // Lite physics: friction + gravity + horizontal extrapolation,
+            // skip CharacterController.Move()
+            ApplyLitePhysics(__instance);
+            ProfilerCounterBridge.Increment("DefaultMoveEntity.LitePhysics");
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Physics-specific intervals, intentionally higher than the global
+    /// GetRecommendedInterval so this patch fires on frames where
+    /// MoveEntityHeaded decides "full update" but full collision is overkill.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int GetPhysicsInterval(EntityBudgetSystem.Tier tier, int zombieCount)
+    {
+        bool emergency = zombieCount >= AdaptiveThresholds.EmergencyZombieThreshold;
+        bool critical = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
+
+        switch (tier)
+        {
+            case EntityBudgetSystem.Tier.Critical:
+                return 1;
+
+            case EntityBudgetSystem.Tier.High:
+                // Global recommended: 1.  Physics: skip every other frame.
+                if (critical) return 3;
+                if (emergency) return 2;
+                return 1;
+
+            case EntityBudgetSystem.Tier.Medium:
+                // Global recommended: 2.  Physics: 3–5.
+                if (critical) return 5;
+                if (emergency) return 3;
+                return 2;
+
+            case EntityBudgetSystem.Tier.Low:
+                // Global recommended: 3–4.  Physics: 5–8.
+                if (critical) return 8;
+                if (emergency) return 5;
+                return 3;
+
+            default:
+                return 1;
+        }
+    }
+
+    /// <summary>
+    /// Lightweight physics step that mirrors vanilla DefaultMoveEntity's
+    /// friction + gravity handling but skips CharacterController.Move().
+    /// Does NOT extrapolate position — entities hold still on lite frames
+    /// to avoid bypassing collision detection (which caused entities to
+    /// pass through players/walls).  At 20m+ distance the pause is invisible.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void ApplyLitePhysics(EntityAlive entity)
+    {
+        try
+        {
+            float gravity = entity.world.Gravity;
+
+            // ── Friction + gravity only (keeps motion vector in sync) ──
+            // Position/boundingBox/PhysicsTransform are NOT touched.
+            // The next full-physics frame will move the entity with proper
+            // CharacterController collision using the decayed motion.
+            if (entity.isSwimming)
+            {
+                entity.motion.x *= 0.91f;
+                entity.motion.z *= 0.91f;
+                entity.motion.y -= gravity * 0.025f;
+                entity.motion.y *= 0.91f;
+            }
+            else
+            {
+                float friction = entity.onGround ? 0.546f : 0.91f;
+                entity.motion.x *= friction;
+                entity.motion.z *= friction;
+
+                if (entity.onGround)
+                {
+                    entity.motion.y = 0f;
+                }
+                else if (!entity.bInElevator)
+                {
+                    entity.motion.y -= gravity;
+                    entity.motion.y *= 0.98f;
+                }
+            }
+        }
+        catch { }
+    }
+
+    public static void ClearCaches() { /* No per-entity state to clear */ }
+}

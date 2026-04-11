@@ -103,8 +103,17 @@ public class OptimizationConfig
     public int ThreatLevelThrottleZombieThreshold = 15; // activate at 15+ zombies
     public int ThreatLevelThrottleFrames = 30;          // ~0.5 sec at 60 fps
 
+    // Combat sub-classification — separates "Active Combat" (has attack/revenge
+    // target or recently attacked) from "Aware Only" (just alert/investigating,
+    // no actual target).  Aware-only entities beyond close range get demoted
+    // from Critical to High tier, allowing mild throttling under FPS stress.
+    // This dramatically reduces MoveHelper obstacle-checking calls and gives
+    // MoveEntityHeaded skip intervals for the ~80% of "combat" entities that
+    // are just bystanders.  Disable if you notice alert zombies being sluggish.
+    public bool EnableCombatSubClassification = true;
+
     public const string ConfigFileName = "fps_optimization_config.json";
-    private const int ConfigVersion = 11;
+    private const int ConfigVersion = 13;
     public int Version = ConfigVersion;
 
     public static OptimizationConfig Current { get; private set; } = new OptimizationConfig();

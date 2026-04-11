@@ -9,8 +9,9 @@
 // frame-skipping for combat-aware entities.
 //
 // - Critical (< 20m or combat):  full speed, full update every frame
-// - Non-critical (20–80m):       speed scales from 100% down to 35%
-// - Far non-combat:              distance LOD with lite motion (unchanged)
+// - Combat-flagged (alert/investigating): full speed (even if tier-demoted)
+// - Non-combat (20–80m):          speed scales from 100% down to 35%
+// - Far non-combat:               distance LOD with lite motion (unchanged)
 //
 // Speed curve thresholds are aligned with EntityBudgetSystem so both
 // systems share a single distance classification.
@@ -60,7 +61,8 @@ public static class MoveEntityHeadedLODPatch
             var cfg = OptimizationConfig.Current;
             if (cfg.EnableSpeedCurveLOD
                 && zombieCount >= cfg.SpeedCurveZombieThreshold
-                && budgetInfo.Tier != EntityBudgetSystem.Tier.Critical)
+                && budgetInfo.Tier != EntityBudgetSystem.Tier.Critical
+                && !budgetInfo.InCombat)
             {
                 float t = Mathf.InverseLerp(EntityBudgetSystem.CLOSE_DIST_SQ, EntityBudgetSystem.FAR_DIST_SQ, distSq);
                 float speedMult = Mathf.Lerp(1f, cfg.SpeedCurveMinMult, t);
@@ -86,8 +88,13 @@ public static class MoveEntityHeadedLODPatch
             // and the entity freezes visibly at the jump apex
             if (!__instance.onGround && !__instance.isSwimming) return true;
 
-            ApplyLiteMotion(__instance);
-            ProfilerCounterBridge.Increment("MoveEntityHeaded.LiteMotion");
+            // Safety: only apply LiteMotion to very far, Low-tier entities (>80m).
+            // Prevents mid-range entities from being extrapolated and becoming sluggish.
+            if (budgetInfo.Tier == EntityBudgetSystem.Tier.Low)
+            {
+                ApplyLiteMotion(__instance);
+                ProfilerCounterBridge.Increment("MoveEntityHeaded.LiteMotion");
+            }
             return false;
         }
         catch

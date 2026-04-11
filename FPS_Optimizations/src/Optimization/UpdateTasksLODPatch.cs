@@ -56,8 +56,11 @@ public static class UpdateTasksLODPatch
             // Critical tier = close or combat → always full updateTasks
             if (budgetInfo.Tier == EntityBudgetSystem.Tier.Critical) return true;
 
-            // High tier only throttles under extreme load
-            if (budgetInfo.Tier == EntityBudgetSystem.Tier.High && zombieCount < 100) return true;
+            // High tier runs full updateTasks unless zombie count is extreme (100+).
+            // At z<100, High tier always gets full AI re-evaluation.
+            if (budgetInfo.Tier == EntityBudgetSystem.Tier.High
+                && zombieCount < 100)
+                return true;
 
             // Use budget system's recommended interval
             int interval = EntityBudgetSystem.GetRecommendedInterval(budgetInfo.Tier, zombieCount);

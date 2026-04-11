@@ -31,6 +31,14 @@ public class ProfilerConfig
     /// </summary>
     public bool EnableCallChainInstrumentation = true;
 
+    /// <summary>
+    /// Controls whether the heavy single-shot stack-trace diagnostics for
+    /// "Direct/Unknown" call sources are written to the main log as WARN.
+    /// Default: false to avoid noisy logs during loading/idle.
+    /// Set true only when actively investigating.
+    /// </summary>
+    public bool EnableStackTraceDiagnostics = false;
+
     public const string ConfigFileName = "profiler_config.json";
     private const int ConfigVersion = 10;
 
@@ -83,7 +91,7 @@ public class ProfilerConfig
                 folder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             }
             string path = Path.Combine(folder, ConfigFileName);
-            string json = JsonConvert.SerializeObject(Current, Formatting.Indented);
+            string json = JsonConvert.SerializeObject(Current, Newtonsoft.Json.Formatting.Indented);
             File.WriteAllText(path, json);
         }
         catch (Exception ex)
@@ -99,5 +107,6 @@ public class ProfilerConfig
         old.EnableDeepEntityInstrumentation = false;
         old.EnableCallChainInstrumentation = true;
         old.EnableProfiling = true;
+        old.EnableStackTraceDiagnostics = false;
     }
 }
