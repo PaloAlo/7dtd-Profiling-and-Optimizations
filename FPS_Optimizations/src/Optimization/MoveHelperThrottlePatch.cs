@@ -1,8 +1,8 @@
 // MoveHelperThrottlePatch.cs
 //
 // Throttles obstacle-checking inside EntityMoveHelper.UpdateMoveHelper.
-// Runs full checks when entity appears stuck; lighter checks when moving freely.
-// Combat-engaged entities always get full updates.
+// Only applies to Low-tier entities (>80m, non-combat).  All other tiers
+// get full obstacle avoidance every frame to prevent stuck/circling behavior.
 
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -45,8 +45,9 @@ public static class MoveHelperThrottlePatch
             if (!EntityBudgetSystem.TryGetInfo(entityId, out var budgetInfo))
                 return true;
 
-            // Combat entities always get full obstacle avoidance.
-            if (budgetInfo.InCombat) return true;
+            // Only throttle Low tier (>80m non-combat) — all other tiers
+            // get full obstacle avoidance every frame.
+            if (budgetInfo.Tier != EntityBudgetSystem.Tier.Low) return true;
 
             int currentFrame = Time.frameCount;
             int zombieCount = FrameCache.ZombieCount;

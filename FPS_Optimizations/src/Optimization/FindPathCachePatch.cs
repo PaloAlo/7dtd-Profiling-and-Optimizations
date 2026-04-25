@@ -3,7 +3,6 @@
 // Blocks exact-duplicate path requests for distant idle zombies.
 // Combat-engaged or close (<20 m) entities always get fresh A* paths.
 
-using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using HarmonyLib;

@@ -1,10 +1,10 @@
 // SpeedStrafeThrottlePatch.cs
 //
-// Throttles EntityAlive.updateSpeedForwardAndStrafe for distant non-combat
-// entities.  Combat-engaged entities always get fresh heading recalculation.
+// Throttles EntityAlive.updateSpeedForwardAndStrafe for Low-tier entities
+// (>80m, non-combat).  All other tiers get full speed/strafe updates every
+// frame to prevent sluggish movement or heading lag.
 
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using HarmonyLib;
 using UnityEngine;
 
@@ -12,10 +12,6 @@ using UnityEngine;
 public static class SpeedStrafeThrottlePatch
 {
     private static readonly Dictionary<int, int> s_lastFrame = new Dictionary<int, int>(256);
-
-    private const float ALWAYS_RUN_DIST_SQ = 900f;  // 30 m
-    private const float MID_DIST_SQ = 2500f;        // 50 m
-    private const float FAR_DIST_SQ = 6400f;        // 80 m
 
     public static bool Prefix(EntityAlive __instance)
     {
@@ -38,8 +34,9 @@ public static class SpeedStrafeThrottlePatch
             if (!EntityBudgetSystem.TryGetInfo(entityId, out var budgetInfo))
                 return true;
 
-            // Critical tier = close or combat → always full update
-            if (budgetInfo.Tier == EntityBudgetSystem.Tier.Critical) return true;
+            // Only throttle Low tier (>80m non-combat) — all other tiers
+            // get full speed/strafe updates every frame
+            if (budgetInfo.Tier != EntityBudgetSystem.Tier.Low) return true;
 
             int skipInterval = EntityBudgetSystem.GetRecommendedInterval(budgetInfo.Tier, zombieCount);
             if (skipInterval <= 1) return true;

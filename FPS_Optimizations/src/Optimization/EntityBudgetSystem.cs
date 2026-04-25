@@ -4,23 +4,22 @@
 // distance + combat checks scattered across 6+ individual throttle patches.
 //
 // Runs ONCE per frame (in FrameCache.Refresh) and classifies every zombie
-// into one of four priority tiers:
+// into one of four priority tiers based on DISTANCE + ACTIVE COMBAT:
 //
-//   CRITICAL  — Close range (< 20m) OR in combat.  Full update every frame.
-//   HIGH      — Mid range (20–50m), not in combat.  Full update every frame
-//               at moderate counts; mild throttle under heavy load.
-//   MEDIUM    — Far range (50–80m), not in combat.  Throttled update interval.
-//   LOW       — Very far (> 80m), not in combat.  Aggressive throttle / skip.
+//   CRITICAL  — Close range (< 20m) OR in active combat (has attack/revenge
+//               target, or recently attacked).  Full update every frame.
+//   HIGH      — Mid range (20–50m), not in active combat.  Full update every
+//               frame at moderate counts; mild throttle under heavy load.
+//   MEDIUM    — Far range (50–80m), not in active combat.  Throttled update.
+//   LOW       — Very far (> 80m), not in active combat.  Aggressive throttle.
+//
+// Aware-only entities (just alert/investigating, no actual target) are
+// classified purely by distance.  This ensures distance-based optimizations
+// actually fire — previously, isAlert spread to ~90% of zombies during
+// combat, forcing them all to High tier and making Budget.Low = 0.
 //
 // Each patch queries EntityBudgetSystem.GetTier(entityId) for O(1) lookup
 // instead of independently computing distance + combat + thresholds.
-//
-// Benefits:
-//   - Distance to player calculated ONCE per entity per frame (not 6x)
-//   - Combat state checked ONCE per entity per frame (not 6x)
-//   - Centralized tier logic makes behavior predictable and tunable
-//   - Round-robin frame assignment ensures even distribution of deferred work
-//   - Close + combat entities ALWAYS get full updates (prevents sleeping zombie bugs)
 
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -135,18 +134,12 @@ public static class EntityBudgetSystem
 
             // Combat check — done ONCE here instead of in every patch.
             // Read backing fields directly to bypass Harmony/Profiler interception
-            // on GetAttackTarget()/GetRevengeTarget(), then seed the target cache
-            // so downstream callers this frame get cache hits.
-            var attackTgt = entity.attackTarget;
-            var revengeTgt = entity.revengeEntity;
-            if (OptimizationConfig.Current.EnableTargetCache)
-            {
-                GetAttackTargetCachePatch.SeedCache(entityId, attackTgt);
-                GetRevengeTargetCachePatch.SeedCache(entityId, revengeTgt);
-            }
-
-            bool hasAttackTarget = attackTgt != null;
-            bool hasRevengeTarget = revengeTgt != null;
+            // on GetAttackTarget()/GetRevengeTarget().
+            // NOTE: Do NOT seed the target cache here.  Seeding before AI runs
+            // causes stale reads for the rest of the frame after AI sets a new
+            // target.  The per-frame cache in TargetCachePatch handles itself.
+            bool hasAttackTarget = entity.attackTarget != null;
+            bool hasRevengeTarget = entity.revengeEntity != null;
             bool recentlyAttacked = entity.hasBeenAttackedTime > 0;
             bool isAlert = entity.isAlert;
             bool isInvestigating = entity.HasInvestigatePosition;
@@ -199,30 +192,23 @@ public static class EntityBudgetSystem
                     else criticalClose++;
                 }
             }
-            else if (inCombat)
-            {
-                // Aware-only: alert/investigating without actual target, beyond
-                // close range.  Demoted from Critical to High so mild throttling
-                // can apply under load.  Full updates at low zombie counts;
-                // skip-interval kicks in at emergency threshold.
-                tier = Tier.High;
-                HighCount++;
-                awareDemotedCount++;
-            }
             else if (distSq < MID_DIST_SQ)
             {
                 tier = Tier.High;
                 HighCount++;
+                if (inCombat && !inActiveCombat) awareDemotedCount++;
             }
             else if (distSq < FAR_DIST_SQ)
             {
                 tier = Tier.Medium;
                 MediumCount++;
+                if (inCombat && !inActiveCombat) awareDemotedCount++;
             }
             else
             {
                 tier = Tier.Low;
                 LowCount++;
+                if (inCombat && !inActiveCombat) awareDemotedCount++;
             }
 
             // Pre-compute round-robin slot for consistent frame assignment

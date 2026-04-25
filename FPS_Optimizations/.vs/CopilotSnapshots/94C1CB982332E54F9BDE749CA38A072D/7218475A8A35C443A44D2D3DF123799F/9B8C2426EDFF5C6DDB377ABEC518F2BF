@@ -1,0 +1,78 @@
+﻿// SharedPlayerVisibilityPatch.cs
+//
+// Caches per-frame LOS raycast results against the player by chunk sector.
+// Nearby zombies in the same 16×16 chunk column share one raycast result.
+
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntitySeeCache), nameof(EntitySeeCache.CanSee))]
+public static class SharedPlayerVisibilityPatch
+{
+    private static readonly Dictionary<long, bool> s_visibilityCache = new Dictionary<long, bool>(64);
+    private static int s_lastClearFrame = -1;
+
+    public static bool Prefix(EntitySeeCache __instance, EntityAlive ___theEntity, Entity _e, ref bool __result)
+    {
+        if (!OptimizationConfig.Current.EnableTargetCache) return true;
+        if (___theEntity == null || _e == null) return true;
+
+        try
+        {
+            if (!(_e is EntityPlayer)) return true;
+
+            FrameCache.EnsureUpdated();
+            if (FrameCache.ShouldBypassThrottling) return true;
+
+            if (FrameCache.ZombieCount < AdaptiveThresholds.EmergencyZombieThreshold)
+                return true;
+
+            int frame = Time.frameCount;
+            if (s_lastClearFrame != frame)
+            {
+                s_visibilityCache.Clear();
+                s_lastClearFrame = frame;
+            }
+
+            var pos = ___theEntity.position;
+            int chunkX = Mathf.FloorToInt(pos.x) >> 4;
+            int chunkZ = Mathf.FloorToInt(pos.z) >> 4;
+            long key = ((long)chunkX << 32) | (uint)chunkZ;
+
+            if (s_visibilityCache.TryGetValue(key, out bool cached))
+            {
+                __result = cached;
+                ProfilerCounterBridge.Increment("SeeCache.SharedHit");
+                return false;
+            }
+
+            return true;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    public static void Postfix(EntitySeeCache __instance, EntityAlive ___theEntity, Entity _e, bool __result)
+    {
+        if (!OptimizationConfig.Current.EnableTargetCache) return;
+        if (___theEntity == null || _e == null) return;
+        if (!(_e is EntityPlayer)) return;
+
+        try
+        {
+            if (FrameCache.ZombieCount < AdaptiveThresholds.EmergencyZombieThreshold) return;
+
+            var pos = ___theEntity.position;
+            int chunkX = Mathf.FloorToInt(pos.x) >> 4;
+            int chunkZ = Mathf.FloorToInt(pos.z) >> 4;
+            long key = ((long)chunkX << 32) | (uint)chunkZ;
+
+            s_visibilityCache[key] = __result;
+        }
+        catch { }
+    }
+}

@@ -1,0 +1,67 @@
+﻿// ZombieFrameSkipPatch.cs
+//
+// Skips EntityAlive.Update() for Low-tier entities (>80m, non-active-combat)
+// during high zombie counts.  Update() itself is cheap (~0.018 ms) but at
+// 80+ zombies the aggregate adds up.
+//
+// SAFETY:
+//   - Never modifies entity state (motion, speed, etc.).
+//   - Transparent during AI-off and the grace period after AI resumes.
+//   - Combat-engaged entities always run.
+
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntityAlive), nameof(EntityAlive.Update))]
+public static class ZombieFrameSkipPatch
+{
+    private static readonly Dictionary<int, int> s_lastUpdateFrame = new Dictionary<int, int>(256);
+
+    public static bool Prefix(EntityAlive __instance)
+    {
+        if (__instance == null) return true;
+        if (__instance is EntityPlayer) return true;
+        if (!OptimizationConfig.Current.EnableMoveLOD) return true;
+
+        FrameCache.EnsureUpdated();
+        if (FrameCache.ShouldBypassThrottling) return true;
+
+        try
+        {
+            int zombieCount = FrameCache.ZombieCount;
+            if (zombieCount < AdaptiveThresholds.EmergencyZombieThreshold)
+                return true;
+
+            if (__instance.IsSleeping) return true;
+
+            // Use centralized entity budget classification
+            int entityId = __instance.entityId;
+            if (!EntityBudgetSystem.TryGetInfo(entityId, out var budgetInfo))
+                return true;
+
+            // Only skip Low tier (> 80m, non-combat) — matches original ALWAYS_UPDATE_DIST_SQ
+            if (budgetInfo.Tier != EntityBudgetSystem.Tier.Low) return true;
+
+            bool criticalMode = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
+            int skipInterval = criticalMode ? 4 : 3;
+
+            if (EntityBudgetSystem.ShouldRunThisFrame(entityId, skipInterval))
+            {
+                s_lastUpdateFrame[entityId] = Time.frameCount;
+                return true;
+            }
+
+            ProfilerCounterBridge.Increment("ZombieFrame.Skipped");
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    public static void OnEntityRemoved(int entityId) => s_lastUpdateFrame.Remove(entityId);
+    public static void ClearCaches() => s_lastUpdateFrame.Clear();
+}

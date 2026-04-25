@@ -1,6 +1,7 @@
 // BlockPosUpdateThrottlePatch.cs
 //
 // Distance-based throttling for EntityAlive.updateCurrentBlockPosAndValue.
+// Uses EntityBudgetSystem tiers for consistent distance classification.
 // This method updates the entity's knowledge of which block it occupies —
 // needed for damage-over-time (fire, drowning) and navigation hints.
 // For distant non-combat entities the stale-by-a-few-frames data is harmless.
@@ -13,10 +14,6 @@ using UnityEngine;
 public static class BlockPosUpdateThrottlePatch
 {
     private static readonly Dictionary<int, int> s_lastFrame = new Dictionary<int, int>(256);
-
-    private const float CLOSE_DIST_SQ = 900f;    // 30 m — always run
-    private const float MID_DIST_SQ = 2500f;     // 50 m
-    private const float FAR_DIST_SQ = 6400f;     // 80 m
 
     public static bool Prefix(EntityAlive __instance)
     {
@@ -35,31 +32,18 @@ public static class BlockPosUpdateThrottlePatch
             if (zombieCount < AdaptiveThresholds.EmergencyZombieThreshold)
                 return true;
 
-            bool criticalMode = zombieCount >= AdaptiveThresholds.CriticalZombieThreshold;
-
-            float distSq = (__instance.position - FrameCache.PlayerPosition).sqrMagnitude;
-
-            int interval;
-            if (distSq < CLOSE_DIST_SQ)
-            {
-                // Close entities: only throttle under critical load
-                if (!criticalMode) return true;
-                interval = 2;
-            }
-            else if (distSq < MID_DIST_SQ)
-            {
-                interval = criticalMode ? 3 : 2;
-            }
-            else if (distSq < FAR_DIST_SQ)
-            {
-                interval = criticalMode ? 4 : 3;
-            }
-            else
-            {
-                interval = criticalMode ? 6 : 4;
-            }
-
             int entityId = __instance.entityId;
+
+            if (!EntityBudgetSystem.TryGetInfo(entityId, out var budgetInfo))
+                return true;
+
+            // Critical tier always gets full updates
+            if (budgetInfo.Tier == EntityBudgetSystem.Tier.Critical) return true;
+
+            // Use budget system interval, with a minimum of 2 for block pos
+            int interval = EntityBudgetSystem.GetRecommendedInterval(budgetInfo.Tier, zombieCount);
+            if (interval <= 1) return true;
+
             int currentFrame = Time.frameCount;
 
             if (!s_lastFrame.TryGetValue(entityId, out int lastFrame))

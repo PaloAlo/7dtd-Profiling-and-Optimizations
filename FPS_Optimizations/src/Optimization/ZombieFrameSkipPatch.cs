@@ -1,8 +1,8 @@
 // ZombieFrameSkipPatch.cs
 //
-// Skips EntityAlive.Update() for very distant non-combat zombies during high
-// zombie counts.  Update() itself is cheap (~0.018 ms) but at 80+ zombies the
-// aggregate adds up.  Only applies beyond 80 m where the skip is invisible.
+// Skips EntityAlive.Update() for Low-tier entities (>80m, non-active-combat)
+// during high zombie counts.  Update() itself is cheap (~0.018 ms) but at
+// 80+ zombies the aggregate adds up.
 //
 // SAFETY:
 //   - Never modifies entity state (motion, speed, etc.).
@@ -10,7 +10,6 @@
 //   - Combat-engaged entities always run.
 
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using HarmonyLib;
 using UnityEngine;
 
@@ -18,9 +17,6 @@ using UnityEngine;
 public static class ZombieFrameSkipPatch
 {
     private static readonly Dictionary<int, int> s_lastUpdateFrame = new Dictionary<int, int>(256);
-
-    private const float ALWAYS_UPDATE_DIST_SQ = 6400f;   // 80 m
-    private const float FAR_DIST_SQ = 14400f;            // 120 m
 
     public static bool Prefix(EntityAlive __instance)
     {

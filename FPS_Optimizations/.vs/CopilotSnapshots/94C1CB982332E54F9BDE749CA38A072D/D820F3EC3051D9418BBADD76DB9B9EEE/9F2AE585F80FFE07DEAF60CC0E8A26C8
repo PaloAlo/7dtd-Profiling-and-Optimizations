@@ -1,0 +1,106 @@
+﻿// MoveEntityHeadedLODPatch.cs
+//
+// Distance-based throttling for MoveEntityHeaded — Low tier only (>80m).
+//
+// V6 — Low-Tier-Only, No LiteMotion:
+// Only Low tier entities (>80m, non-combat) get movement throttling.
+// On skip frames, the entity simply freezes in place — at 80m+ this
+// is invisible to the player.  LiteMotion extrapolation was removed
+// because friction decay (0.546^N per skip frame) caused "superglue
+// feet" where entities slowed to near-zero speed.
+//
+// - Critical (< 20m or active combat): full speed, full update every frame
+// - High (20–50m):                     full speed, full update every frame
+// - Medium (50–80m):                   full speed, full update every frame
+// - Low (> 80m, non-active-combat):    speed curve + freeze on skip frames
+
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntityAlive), nameof(EntityAlive.MoveEntityHeaded))]
+public static class MoveEntityHeadedLODPatch
+{
+    private static readonly Dictionary<int, int> s_lastUpdateFrame = new Dictionary<int, int>(256);
+
+    public static bool Prefix(EntityAlive __instance, ref Vector3 _direction, bool _isDirAbsolute)
+    {
+        if (!OptimizationConfig.Current.EnableMoveLOD) return true;
+        if (__instance == null) return true;
+        if (__instance is EntityPlayer) return true;
+
+        FrameCache.EnsureUpdated();
+        if (FrameCache.ShouldBypassThrottling) return true;
+
+        try
+        {
+            if (__instance.IsSleeping) return true;
+
+            // Don't extrapolate entities with special movement modes
+            if (__instance.AttachedToEntity != null) return true;
+            if (__instance.jumpIsMoving) return true;
+            if (__instance.IsFlyMode.Value) return true;
+
+            int entityId = __instance.entityId;
+            int zombieCount = FrameCache.ZombieCount;
+
+            // Use centralized entity budget classification
+            if (!EntityBudgetSystem.TryGetInfo(entityId, out var budgetInfo))
+                return true;
+
+            float distSq = budgetInfo.DistanceSq;
+
+            // ── All non-Low tiers: full speed, full physics, every frame ──
+            // Only Low tier (>80m non-combat) gets any movement throttling.
+            if (budgetInfo.Tier != EntityBudgetSystem.Tier.Low) return true;
+
+            // ── Speed-Curve LOD (Low tier only) ──────────────────────────
+            var cfg = OptimizationConfig.Current;
+            if (cfg.EnableSpeedCurveLOD
+                && zombieCount >= cfg.SpeedCurveZombieThreshold)
+            {
+                float t = Mathf.InverseLerp(EntityBudgetSystem.CLOSE_DIST_SQ, EntityBudgetSystem.FAR_DIST_SQ, distSq);
+                float speedMult = Mathf.Lerp(1f, cfg.SpeedCurveMinMult, t);
+                _direction *= speedMult;
+                ProfilerCounterBridge.Increment("MoveSpeed.Curved");
+            }
+
+            // Use budget system's recommended interval for this tier
+            int skipInterval = EntityBudgetSystem.GetRecommendedInterval(budgetInfo.Tier, zombieCount);
+            if (skipInterval <= 1) return true;
+
+            if (EntityBudgetSystem.ShouldRunThisFrame(entityId, skipInterval))
+            {
+                s_lastUpdateFrame[entityId] = Time.frameCount;
+                return true;
+            }
+
+            // Never throttle airborne entities — can't handle Y physics
+            if (!__instance.onGround && !__instance.isSwimming) return true;
+
+            // Skip this frame entirely — entity stays at its current position.
+            // At 80m+ the visual freeze is invisible to the player.  Removing
+            // the old LiteMotion extrapolation fixes the "superglue feet" bug
+            // where friction 0.546^N decayed motion to near-zero on skip frames.
+            ProfilerCounterBridge.Increment("MoveEntityHeaded.Skipped");
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    public static void OnEntityRemoved(int entityId) => s_lastUpdateFrame.Remove(entityId);
+    public static void ClearCaches() => s_lastUpdateFrame.Clear();
+}
+
+public static class EntityAliveExtensions
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool HasAttackTarget(this EntityAlive entity)
+    {
+        return entity.GetAttackTarget() != null;
+    }
+}

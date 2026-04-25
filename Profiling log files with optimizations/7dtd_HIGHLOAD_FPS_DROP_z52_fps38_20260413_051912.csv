@@ -1,0 +1,113 @@
+# HIGH-LOAD CAPTURE: FPS_DROP
+# Timestamp: 2026-04-13T05:19:12.5251074Z
+# Frame: 31237
+# ZombieCount: 52
+# CurrentFPS: 38.34
+# BaselineFPS: 115.81
+# PeakFPS: 195.80
+# FPSDrop%: 66.9%
+# PeakZombies: 56
+# CaptureNumber: 3/5
+# GC_MB: 2508.3
+
+=== TIMING DATA (sorted by TotalMs) ===
+Tag,TotalMs,Calls,AvgMs,PercentOfTotal,Category
+EntityAlive.MoveEntityHeaded,575.0159,33632,0.017097,24.86%,AI_ENTITY
+EntityAlive.updateTasks,501.4635,28956,0.017318,21.68%,AI_ENTITY
+EntityAlive.Update,287.8445,39119,0.007358,12.44%,AI_ENTITY
+EntityPlayerLocal.Update,282.9221,592,0.477909,12.23%,PLAYER
+EntityMoveHelper.UpdateMoveHelper,195.5227,28956,0.006752,8.45%,MOVEMENT
+EAIManager.Update,157.1753,8190,0.019191,6.79%,AI_TASK
+Entity.Update,103.3471,29089,0.003553,4.47%,OTHER
+EntityAlive.updateCurrentBlockPosAndValue,82.7418,18817,0.004397,3.58%,AI_ENTITY
+EntityLookHelper.onUpdateLook,50.0020,28956,0.001727,2.16%,OTHER
+EntityPlayer.Update,26.4082,592,0.044608,1.14%,OTHER
+EntitySeeCache.CanSee,22.0148,5214,0.004222,0.95%,SENSING
+EntitySeeCache.ClearIfExpired,12.1568,16194,0.000751,0.53%,SENSING
+BaseObjective.Update,5.9491,592,0.010049,0.26%,OTHER
+GUIWindow.Update,4.6875,5382,0.000871,0.20%,UI
+EntityAlive.updateSpeedForwardAndStrafe,3.4380,3432,0.001002,0.15%,AI_ENTITY
+EAIBase.Update,1.7183,1219,0.001410,0.07%,AI_TASK
+EntityAlive.FindPath,0.7589,277,0.002740,0.03%,AI_ENTITY
+
+=== CALL COUNTS ===
+Counter,Value
+Combat.Total,32927
+Combat.Alert,29055
+Combat.Investigating,25359
+Budget.AwareDemoted,25284
+MoveSpeed.CacheHit,18519
+MoveEntityHeaded.calls,16816
+GetAttackTarget.Total,16565
+Budget.Low,16051
+updateTasks.calls,14478
+CallChain.GetAttackTarget.from.Direct/Unknown,13080
+ZombieFrame.Skipped,12032
+Budget.Critical,10578
+Budget.High,7108
+BlockPosUpdate.Throttled,6372
+MoveSpeed.Curved,6368
+Critical.Combat,5666
+updateTasks.LiteRun,5333
+EAIManager.EvalThrottled,5333
+MoveEntityHeaded.Skipped,5065
+Critical.Close,4912
+Combat.AttackTarget,4909
+Budget.Medium,4803
+GetAttackTarget.CacheHit,4709
+CallChain.GetAttackTarget.from.OnUpdateLive,3485
+Combat.RevengeTarget,3143
+MoveHelper.Throttled,2920
+CallChain.GetRevengeTarget.from.OnUpdateLive,2131
+GetRevengeTarget.Total,2131
+updateSpeedForwardAndStrafe.calls,1716
+EntityCollision.Skipped,1355
+SpeedStrafe.Throttled,1101
+JiggleBone.Disabled,699
+ThreatLevel.Throttled,592
+PlayerShelter.Throttled,444
+SleeperVolume.Skipped,214
+PlayerBlockRadius.Throttled,134
+Budget.Grace,117
+Particle.EmissionScaled,58
+Combat.RecentlyAttacked,18
+GetRevengeTarget.CacheHit,2
+
+=== OPTIMIZATION EFFECTIVENESS ===
+# Shows how much work our patches skipped vs total calls
+MoveEntityHeaded.Lite: skipped=0, total=16816, rate=0.0%
+updateTasks.Lite: skipped=5333, total=14478, rate=36.8%
+GetAttackTarget: skipped=4709, total=16565, rate=28.4%
+GetRevengeTarget: skipped=2, total=2131, rate=0.1%
+EntityCollision: skipped=1355, total=1355, rate=100.0%
+MoveHelper: skipped=2920, total=2920, rate=100.0%
+SpeedStrafe: skipped=1101, total=1101, rate=100.0%
+EAIManager.Eval: skipped=5333, total=5333, rate=100.0%
+PlayerBlockRadius: skipped=134, total=134, rate=100.0%
+PlayerShelter: skipped=444, total=444, rate=100.0%
+ZombieFrame: skipped=12032, total=12032, rate=100.0%
+MoveSpeed: skipped=18519, total=18519, rate=100.0%
+
+=== CALL CHAIN: WHO CALLS GetAttackTarget / GetRevengeTarget ===
+# Format: CallChain.<TargetMethod>.from.<CallerMethod>,Count
+# 'Direct/Unknown' = called from a site we don't instrument
+Caller,Calls
+CallChain.GetAttackTarget.from.Direct/Unknown,13080
+CallChain.GetAttackTarget.from.OnUpdateLive,3485
+CallChain.GetRevengeTarget.from.OnUpdateLive,2131
+
+=== GAME CPU COST PER ZOMBIE ===
+# How much CPU time (ms) the GAME spends per zombie for each system.
+# This is NOT profiling overhead — it is the actual game workload divided by zombie count.
+# Lower values = better optimization. Compare across captures to track improvement.
+TotalMs per zombie: 44.4840
+EntityAlive.MoveEntityHeaded: 11.0580 ms/zombie
+EntityAlive.updateTasks: 9.6435 ms/zombie
+EntityAlive.Update: 5.5355 ms/zombie
+EntityPlayerLocal.Update: 5.4408 ms/zombie
+EntityMoveHelper.UpdateMoveHelper: 3.7601 ms/zombie
+EAIManager.Update: 3.0226 ms/zombie
+Entity.Update: 1.9874 ms/zombie
+EntityAlive.updateCurrentBlockPosAndValue: 1.5912 ms/zombie
+EntityLookHelper.onUpdateLook: 0.9616 ms/zombie
+EntityPlayer.Update: 0.5079 ms/zombie

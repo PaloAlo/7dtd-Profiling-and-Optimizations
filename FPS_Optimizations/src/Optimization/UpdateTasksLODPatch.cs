@@ -17,6 +17,7 @@
 //   - aiManager.Update full re-evaluation (CanExecute / Continue / isBestTask
 //     loop across all tasks).  Only fires on full-update frames.
 
+using System;
 using System.Collections.Generic;
 using GamePath;
 using HarmonyLib;
@@ -27,11 +28,6 @@ using UnityEngine;
 public static class UpdateTasksLODPatch
 {
     private static readonly Dictionary<int, int> s_lastFullUpdateFrame = new Dictionary<int, int>(256);
-
-    private const float CLOSE_DIST_SQ = 400f;     // 20 m
-    private const float MID_DIST_SQ = 900f;       // 30 m
-    private const float FAR_DIST_SQ = 2500f;      // 50 m
-    private const float VERY_FAR_DIST_SQ = 6400f; // 80 m
 
     public static bool Prefix(EntityAlive __instance)
     {
@@ -104,26 +100,56 @@ public static class UpdateTasksLODPatch
             entity.seeCache?.ClearIfExpired();
 
             // 2. Continue executing tasks (approach keeps walking, etc.)
-            //    Skip the full CanExecute/Continue re-evaluation loop.
+            //    Skip the full CanExecute/Continue re-evaluation loop when possible.
             if (entity.aiManager != null)
             {
                 bool useAIPackages = EntityClass.list[entity.entityClass].UseAIPackages;
                 if (!useAIPackages)
                 {
-                    if (!EAITaskEvaluationThrottlePatch.ContinueExecutingOnly(entity.aiManager))
+                    bool contOk = false;
+                    try
                     {
-                        // Reflection failed — fall through to full update
-                        entity.aiManager.Update();
+                        // Try the safe continue-only path. It returns true when it
+                        // successfully performed the safe per-task Continue/Update logic.
+                        contOk = EAITaskEvaluationThrottlePatch.ContinueExecutingOnly(entity.aiManager);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Defensive: ContinueExecutingOnly should not throw, but if it does,
+                        // log and fall back to the full update below (inside its own try/catch).
+                        Log.Warning("[FPSOptimizations] ContinueExecutingOnly threw: " + ex.Message);
+                        contOk = false;
+                    }
+
+                    if (!contOk)
+                    {
+                        // Reflection failed or ContinueExecutingOnly couldn't run safely.
+                        // Fall back to full aiManager.Update(), but DO NOT allow exceptions
+                        // to escape — catch and log them so the world tick continues.
+                        try
+                        {
+                            entity.aiManager.Update();
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning("[FPSOptimizations] aiManager.Update() threw during fallback: " + ex.Message);
+                            // swallow exception to avoid top-level crash; state may be inconsistent
+                            // but this prevents the whole server/game from crashing.
+                        }
                     }
                     else
                     {
                         ProfilerCounterBridge.Increment("EAIManager.EvalThrottled");
                     }
                 }
-                // UAI entities (bandits/NPCs) get full update — they're rare
+                // UAI entities -> full update (rare)
                 else if (entity.utilityAIContext != null)
                 {
-                    UAIBase.Update(entity.utilityAIContext);
+                    try { UAIBase.Update(entity.utilityAIContext); }
+                    catch (Exception ex)
+                    {
+                        Log.Warning("[FPSOptimizations] UAIBase.Update() threw: " + ex.Message);
+                    }
                 }
             }
 
@@ -131,11 +157,12 @@ public static class UpdateTasksLODPatch
             PathInfo path = PathFinderThread.Instance.GetPath(entity.entityId);
             if (path.path != null)
             {
-                bool useAIPackages = EntityClass.list[entity.entityClass].UseAIPackages;
+                bool useAIPackages2 = EntityClass.list[entity.entityClass].UseAIPackages;
                 bool accept = true;
-                if (!useAIPackages && entity.aiManager != null)
+                if (!useAIPackages2 && entity.aiManager != null)
                 {
-                    accept = entity.aiManager.CheckPath(path);
+                    try { accept = entity.aiManager.CheckPath(path); }
+                    catch { accept = false; }
                 }
                 if (accept)
                 {
@@ -144,21 +171,9 @@ public static class UpdateTasksLODPatch
             }
 
             // 4. CRITICAL: navigation + movement + look (every frame for smooth motion)
+            //    MoveHelperThrottlePatch handles any Low-tier throttling separately.
             entity.navigator.UpdateNavigation();
-
-            // At extreme zombie counts, moveHelper physics cost scales super-linearly
-            // (500-800ms at 130+ entities).  Throttle on alternating throttled frames
-            // to halve that cost while still keeping obstacle avoidance running frequently.
-            int zCount = FrameCache.ZombieCount;
-            if (zCount < 100 || ((entity.entityId + Time.frameCount) & 1) == 0)
-            {
-                entity.moveHelper.UpdateMoveHelper();
-            }
-            else
-            {
-                ProfilerCounterBridge.Increment("MoveHelper.Throttled");
-            }
-
+            entity.moveHelper.UpdateMoveHelper();
             entity.lookHelper.onUpdateLook();
 
             // 5. Distraction cleanup
@@ -173,7 +188,10 @@ public static class UpdateTasksLODPatch
                 entity.pendingDistraction = null;
             }
         }
-        catch { }
+        catch
+        {
+            // Protect the world tick — any unexpected exception in maintenance should not crash the game.
+        }
     }
 
     public static void OnEntityRemoved(int entityId) => s_lastFullUpdateFrame.Remove(entityId);

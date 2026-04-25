@@ -9,19 +9,20 @@
 //
 // Used by UpdateTasksLODPatch.RunLiteMaintenance on combat-stagger and
 // distance-LOD frames.
+// Lightweight ContinueExecutingOnly using concrete types (no reflection).
+// Per-action try/catch isolates misbehaving tasks without falling back to
+// the full aiManager.Update() except when field resolution failed.
 
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using HarmonyLib;
-using UnityEngine;
 
 public static class EAITaskEvaluationThrottlePatch
 {
     private static readonly Dictionary<int, int> s_lastEvalFrame = new Dictionary<int, int>(256);
 
     // Fast ref accessors into EAIManager's private task lists.
-    // These are cached at first use for zero-allocation per-call access.
+    // Cached at first use for zero-allocation per-call access.
     private static AccessTools.FieldRef<EAIManager, EAITaskList> s_tasksRef;
     private static AccessTools.FieldRef<EAIManager, EAITaskList> s_targetTasksRef;
     private static bool s_resolved;
@@ -45,8 +46,9 @@ public static class EAITaskEvaluationThrottlePatch
     }
 
     /// <summary>
-    /// Lightweight update: continues executing tasks and updates interestDistance
-    /// but skips the full CanExecute / Continue re-evaluation loop.
+    /// Lightweight update: calls Continue() on executing tasks and only Update()
+    /// on tasks that should keep running. Tasks whose Continue() returns false
+    /// are Reset() so the next full evaluation can pick a new one.
     /// Returns true if successful, false if reflection failed (caller should
     /// fall back to full aiManager.Update).
     /// </summary>
@@ -65,23 +67,71 @@ public static class EAITaskEvaluationThrottlePatch
             ContinueTaskList(s_tasksRef(manager));
 
             // Debug name update (only when debug UI is open — virtually free)
-            manager.UpdateDebugName();
+            try { manager.UpdateDebugName(); } catch { /* non-fatal */ }
 
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            // If something truly unexpected happens here, fall back to full update.
+            Log.Warning($"[FPSOptimizations] ContinueExecutingOnly top-level error: {ex.Message}");
             return false;
         }
     }
 
+    // Use concrete typed path (no reflection) but protect each action with try/catch.
     private static void ContinueTaskList(EAITaskList list)
     {
         if (list == null) return;
+
+        // GetExecutingTasks() is expected to return a list-like collection.
         var executing = list.GetExecutingTasks();
-        for (int i = 0; i < executing.Count; i++)
+        if (executing == null) return;
+
+        for (int i = executing.Count - 1; i >= 0; i--)
         {
-            executing[i].action.Update();
+            try
+            {
+                var entry = executing[i];
+                if (entry == null) continue;
+
+                var action = entry.action;
+                if (action == null) continue;
+
+                bool cont;
+                try
+                {
+                    cont = action.Continue();
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("[FPSOptimizations] EAITask.Continue() threw: " + ex.Message);
+                    try { action.Reset(); } catch { }
+                    continue;
+                }
+
+                if (cont)
+                {
+                    try
+                    {
+                        action.Update();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warning("[FPSOptimizations] EAITask.Update() threw: " + ex.Message);
+                        try { action.Reset(); } catch { }
+                    }
+                }
+                else
+                {
+                    try { action.Reset(); } catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Protect the loop — a single bad executing entry must not abort work.
+                Log.Warning("[FPSOptimizations] ContinueTaskList iteration error: " + ex.Message);
+            }
         }
     }
 

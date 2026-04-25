@@ -115,6 +115,8 @@ public static class FrameCache
         UAIDecisionThrottlePatch.ClearCaches();
         ParticleEffectThrottlePatch.ClearCaches();
         ThreatLevelThrottlePatch.ClearCaches();
+        GetAttackTargetCachePatch.ClearCaches();
+        GetRevengeTargetCachePatch.ClearCaches();
         EntityBudgetSystem.Clear();
     }
 }

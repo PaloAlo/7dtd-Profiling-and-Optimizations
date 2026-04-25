@@ -1,20 +1,18 @@
 // MoveEntityHeadedLODPatch.cs
 //
-// Distance-based throttling and speed-curve LOD for MoveEntityHeaded.
+// Distance-based throttling for MoveEntityHeaded — Low tier only (>80m).
 //
-// V4 — Speed-Curve LOD:  Instead of frame-skipping combat/close entities
-// (which breaks AI state machines, causes jerky movement, disappearing
-// zombies, and path loss), we now reduce movement speed based on distance.
-// Distant zombies move slower, creating natural stagger without any
-// frame-skipping for combat-aware entities.
+// V6 — Low-Tier-Only, No LiteMotion:
+// Only Low tier entities (>80m, non-combat) get movement throttling.
+// On skip frames, the entity simply freezes in place — at 80m+ this
+// is invisible to the player.  LiteMotion extrapolation was removed
+// because friction decay (0.546^N per skip frame) caused "superglue
+// feet" where entities slowed to near-zero speed.
 //
-// - Critical (< 20m or combat):  full speed, full update every frame
-// - Combat-flagged (alert/investigating): full speed (even if tier-demoted)
-// - Non-combat (20–80m):          speed scales from 100% down to 35%
-// - Far non-combat:               distance LOD with lite motion (unchanged)
-//
-// Speed curve thresholds are aligned with EntityBudgetSystem so both
-// systems share a single distance classification.
+// - Critical (< 20m or active combat): full speed, full update every frame
+// - High (20–50m):                     full speed, full update every frame
+// - Medium (50–80m):                   full speed, full update every frame
+// - Low (> 80m, non-active-combat):    speed curve + freeze on skip frames
 
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -53,26 +51,20 @@ public static class MoveEntityHeadedLODPatch
 
             float distSq = budgetInfo.DistanceSq;
 
-            // ── Speed-Curve LOD ───────────────────────────────────────
-            // Reduce movement speed based on distance instead of skipping
-            // frames.  Uses budget system tiers for consistent thresholds.
-            // Critical tier (close + combat) gets full speed; others get
-            // distance-based reduction using the same distance ranges.
+            // ── All non-Low tiers: full speed, full physics, every frame ──
+            // Only Low tier (>80m non-combat) gets any movement throttling.
+            if (budgetInfo.Tier != EntityBudgetSystem.Tier.Low) return true;
+
+            // ── Speed-Curve LOD (Low tier only) ──────────────────────────
             var cfg = OptimizationConfig.Current;
             if (cfg.EnableSpeedCurveLOD
-                && zombieCount >= cfg.SpeedCurveZombieThreshold
-                && budgetInfo.Tier != EntityBudgetSystem.Tier.Critical
-                && !budgetInfo.InCombat)
+                && zombieCount >= cfg.SpeedCurveZombieThreshold)
             {
                 float t = Mathf.InverseLerp(EntityBudgetSystem.CLOSE_DIST_SQ, EntityBudgetSystem.FAR_DIST_SQ, distSq);
                 float speedMult = Mathf.Lerp(1f, cfg.SpeedCurveMinMult, t);
                 _direction *= speedMult;
                 ProfilerCounterBridge.Increment("MoveSpeed.Curved");
             }
-
-            // ── Distance-based LOD (non-combat, outside close range) ──
-            // Critical tier = close or combat → always full update
-            if (budgetInfo.Tier == EntityBudgetSystem.Tier.Critical) return true;
 
             // Use budget system's recommended interval for this tier
             int skipInterval = EntityBudgetSystem.GetRecommendedInterval(budgetInfo.Tier, zombieCount);
@@ -84,95 +76,20 @@ public static class MoveEntityHeadedLODPatch
                 return true;
             }
 
-            // Never throttle airborne entities — LiteMotion can't handle Y physics
-            // and the entity freezes visibly at the jump apex
+            // Never throttle airborne entities — can't handle Y physics
             if (!__instance.onGround && !__instance.isSwimming) return true;
 
-            // Safety: only apply LiteMotion to very far, Low-tier entities (>80m).
-            // Prevents mid-range entities from being extrapolated and becoming sluggish.
-            if (budgetInfo.Tier == EntityBudgetSystem.Tier.Low)
-            {
-                ApplyLiteMotion(__instance);
-                ProfilerCounterBridge.Increment("MoveEntityHeaded.LiteMotion");
-            }
+            // Skip this frame entirely — entity stays at its current position.
+            // At 80m+ the visual freeze is invisible to the player.  Removing
+            // the old LiteMotion extrapolation fixes the "superglue feet" bug
+            // where friction 0.546^N decayed motion to near-zero on skip frames.
+            ProfilerCounterBridge.Increment("MoveEntityHeaded.Skipped");
             return false;
         }
         catch
         {
             return true;
         }
-    }
-
-    /// <summary>
-    /// Lightweight motion extrapolation that skips CharacterController.Move()
-    /// but keeps the entity moving smoothly.  Applies gravity + friction to
-    /// the motion vector and extrapolates position, then syncs the physics
-    /// transform so the next full-physics frame starts from the right spot.
-    /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void ApplyLiteMotion(EntityAlive entity)
-    {
-        try
-        {
-            float gravity = entity.world.Gravity;
-
-            // Apply friction/damping to motion — mirrors DefaultMoveEntity
-            if (entity.isSwimming)
-            {
-                entity.motion.x *= 0.91f;
-                entity.motion.z *= 0.91f;
-                // Keep swim buoyancy in motion for next full frame
-                entity.motion.y -= gravity * 0.025f;
-                entity.motion.y *= 0.91f;
-            }
-            else
-            {
-                // Ground friction (0.546f is vanilla's onGround friction)
-                float friction = entity.onGround ? 0.546f : 0.91f;
-                entity.motion.x *= friction;
-                entity.motion.z *= friction;
-
-                if (entity.onGround)
-                {
-                    // On-ground: reset Y motion so gravity doesn't accumulate
-                    // across throttled frames and push the entity below
-                    // floors/terrain — this was causing mass clip-through and
-                    // despawning in multi-story POIs.
-                    entity.motion.y = 0f;
-                }
-                else if (!entity.bInElevator)
-                {
-                    // Airborne: track gravity in motion for the next full frame
-                    entity.motion.y -= gravity;
-                    entity.motion.y *= 0.98f;
-                }
-            }
-
-            // Extrapolate HORIZONTAL position only.
-            // Never modify Y — CharacterController.Move() must handle all
-            // vertical positioning to prevent entities clipping through
-            // thin floors, terrain, or multi-story POI geometry.
-            Vector3 delta = new Vector3(entity.motion.x, 0f, entity.motion.z);
-
-            if (delta.x != 0f || delta.z != 0f)
-            {
-                entity.position += delta;
-
-                // Keep bounding box in sync
-                Bounds bb = entity.boundingBox;
-                bb.center += delta;
-                entity.boundingBox = bb;
-
-                // Sync physics transform so CharacterController starts from
-                // the correct position on the next full-physics frame
-                Transform physT = entity.PhysicsTransform;
-                if (physT != null)
-                {
-                    physT.position = entity.position - Origin.position;
-                }
-            }
-        }
-        catch { }
     }
 
     public static void OnEntityRemoved(int entityId) => s_lastUpdateFrame.Remove(entityId);

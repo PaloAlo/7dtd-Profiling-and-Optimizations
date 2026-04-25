@@ -14,11 +14,6 @@ public class OptimizationConfig
     // LOD for MoveEntityHeaded + Collision + MoveHelper + SpeedStrafe + ZombieFrameSkip
     public bool EnableMoveLOD = true;
 
-    // LOD distance thresholds (squared)
-    public float MoveLODTier1DistSq = 900f;      // 30m — never throttle closer
-    public float MoveLODTier2DistSq = 2500f;     // 50m
-    public float MoveLODTier3DistSq = 6400f;     // 80m
-
     // LOD for updateTasks
     public bool EnableStaggeredUpdate = true;
 
@@ -26,8 +21,11 @@ public class OptimizationConfig
     public bool EnablePathCache = true;
     public float PathCacheTTLSeconds = 1f;
 
-    // Cache GetAttackTarget / GetRevengeTarget per frame
-    public bool EnableTargetCache = true;
+    // Cache GetAttackTarget / GetRevengeTarget per frame.
+    // DISABLED: The underlying method just returns a backing field (O(1)).
+    // The per-frame cache causes stale target reads when AI sets a new target
+    // mid-frame after classification, leading to "stop as if invisible" behavior.
+    public bool EnableTargetCache = false;
 
     // Throttle step sound updates
     public bool EnableStepSoundThrottle = true;
@@ -47,8 +45,6 @@ public class OptimizationConfig
     // AI state machines, navigation, or CharacterController physics.
     public bool EnableSpeedCurveLOD = true;
     public int SpeedCurveZombieThreshold = 30;     // min zombies to activate
-    public float SpeedCurveCloseDistSq = 400f;     // 20m — aligned with budget system CLOSE_DIST_SQ
-    public float SpeedCurveFarDistSq = 6400f;      // 80m — aligned with budget system FAR_DIST_SQ
     public float SpeedCurveMinMult = 0.35f;        // min speed multiplier (35%)
 
     // Throttle World.TickSleeperVolumes to every 4th tick
@@ -113,7 +109,7 @@ public class OptimizationConfig
     public bool EnableCombatSubClassification = true;
 
     public const string ConfigFileName = "fps_optimization_config.json";
-    private const int ConfigVersion = 13;
+    private const int ConfigVersion = 14;
     public int Version = ConfigVersion;
 
     public static OptimizationConfig Current { get; private set; } = new OptimizationConfig();
@@ -227,11 +223,9 @@ public class OptimizationConfig
             var clearActions = new Dictionary<string, Action>(StringComparer.OrdinalIgnoreCase)
             {
                 // Movement / LOD related
-                ["EnableMoveLOD"] = () => { MoveEntityHeadedLODPatch.ClearCaches(); ZombieFrameSkipPatch.ClearCaches(); MoveHelperThrottlePatch.ClearCaches(); EntityCollisionThrottlePatch.ClearCaches(); },
+                ["EnableMoveLOD"] = () => { MoveEntityHeadedLODPatch.ClearCaches(); ZombieFrameSkipPatch.ClearCaches(); MoveHelperThrottlePatch.ClearCaches(); EntityCollisionThrottlePatch.ClearCaches(); MoveSpeedCachePatch.ClearCaches(); },
                 ["EnableSpeedCurveLOD"] = () => { MoveEntityHeadedLODPatch.ClearCaches(); },
                 ["SpeedCurveZombieThreshold"] = () => { MoveEntityHeadedLODPatch.ClearCaches(); },
-                ["SpeedCurveCloseDistSq"] = () => { MoveEntityHeadedLODPatch.ClearCaches(); },
-                ["SpeedCurveFarDistSq"] = () => { MoveEntityHeadedLODPatch.ClearCaches(); },
                 ["SpeedCurveMinMult"] = () => { MoveEntityHeadedLODPatch.ClearCaches(); },
 
                 // UpdateTasks / staggered update
@@ -253,17 +247,9 @@ public class OptimizationConfig
                 // EAI manager throttle
                 ["EnableEAIManagerThrottle"] = () => { EAIManagerUpdateThrottlePatch.ClearCaches(); },
 
-                // Move speed cache
-                ["EnableMoveLOD"] = () => { MoveSpeedCachePatch.ClearCaches(); },
-
                 // Chunk features
                 ["EnableChunkCopyTimeBudget"] = () => { ChunkCopyTimeBudgetPatch.ClearCaches(); },
                 ["EnableChunkDirectionalPriority"] = () => { ChunkDirectionalPriorityPatch.ClearCaches(); },
-
-                // Budget / entity classification
-                ["MoveLODTier1DistSq"] = () => { EntityBudgetSystem.Clear(); },
-                ["MoveLODTier2DistSq"] = () => { EntityBudgetSystem.Clear(); },
-                ["MoveLODTier3DistSq"] = () => { EntityBudgetSystem.Clear(); },
 
                 // Thread pool consolidation doesn't have a runtime cache to clear,
                 // but we report the change.

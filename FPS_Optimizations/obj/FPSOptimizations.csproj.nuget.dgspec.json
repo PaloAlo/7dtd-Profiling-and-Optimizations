@@ -26,6 +26,7 @@
         },
         "frameworks": {
           "net481": {
+            "framework": "net481",
             "targetAlias": "net481",
             "projectReferences": {}
           }
@@ -44,8 +45,9 @@
       },
       "frameworks": {
         "net481": {
+          "framework": "net481",
           "targetAlias": "net481",
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.201\\RuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.202\\RuntimeIdentifierGraph.json"
         }
       }
     }

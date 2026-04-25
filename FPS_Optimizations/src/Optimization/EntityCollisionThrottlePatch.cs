@@ -1,11 +1,11 @@
 // EntityCollisionThrottlePatch.cs
 //
-// Throttles CharacterController.Move() calls for distant non-combat zombies.
-// Physics collision is the most expensive single operation inside
-// MoveEntityHeaded.  Combat-engaged entities always get full collision.
+// Throttles CharacterController.Move() calls for Low-tier entities (>80m,
+// non-active-combat).  Physics collision is the most expensive single
+// operation inside MoveEntityHeaded.  All tiers except Low get full
+// collision every frame.
 
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using HarmonyLib;
 using UnityEngine;
 
@@ -13,10 +13,6 @@ using UnityEngine;
 public static class EntityCollisionThrottlePatch
 {
     private static readonly Dictionary<int, int> s_lastCollisionFrame = new(256);
-
-    private const float CLOSE_DIST_SQ = 400f;  // 20 m
-    private const float MID_DIST_SQ = 900f;    // 30 m
-    private const float FAR_DIST_SQ = 2500f;   // 50 m
 
     public static bool Prefix(Entity __instance, Vector3 _motion)
     {
@@ -39,8 +35,9 @@ public static class EntityCollisionThrottlePatch
             if (!EntityBudgetSystem.TryGetInfo(entityId, out var budgetInfo))
                 return true;
 
-            // Critical tier = close or combat → always full collision
-            if (budgetInfo.Tier == EntityBudgetSystem.Tier.Critical) return true;
+            // Only throttle Low tier (>80m non-combat) — all other tiers
+            // get full collision every frame to prevent sluggish movement
+            if (budgetInfo.Tier != EntityBudgetSystem.Tier.Low) return true;
 
             int zombieCount = FrameCache.ZombieCount;
             int skipInterval = EntityBudgetSystem.GetRecommendedInterval(budgetInfo.Tier, zombieCount);

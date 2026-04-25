@@ -46,8 +46,7 @@
               "RelativeToolTip": "src\\Profiling\\ProfilerConfig.cs",
               "ViewState": "AgIAAF8AAAAAAAAAAIAwwAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-10T17:00:53.147Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-04-10T17:00:53.147Z"
             },
             {
               "$type": "Document",
@@ -59,8 +58,7 @@
               "RelativeToolTip": "src\\Patches\\PrefabLODInstrumentation.cs",
               "ViewState": "AgIAAAMAAAAAAAAAAAAAACEAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-10T16:29:13.602Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-04-10T16:29:13.602Z"
             },
             {
               "$type": "Document",
@@ -72,8 +70,7 @@
               "RelativeToolTip": "src\\Patches\\PhysicsQueryInstrumentation.cs",
               "ViewState": "AgIAAKwAAAAAAAAAAAAQwL4AAACDAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-10T16:03:01.986Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-04-10T16:03:01.986Z"
             },
             {
               "$type": "Document",
@@ -85,8 +82,7 @@
               "RelativeToolTip": "src\\Patches\\CallChainInstrumentation.cs",
               "ViewState": "AgIAAF0BAAAAAAAAAAArwBMAAAAhAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-10T02:41:01.013Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-04-10T02:41:01.013Z"
             },
             {
               "$type": "Document",

@@ -1,0 +1,72 @@
+﻿// BlockPosUpdateThrottlePatch.cs
+//
+// Distance-based throttling for EntityAlive.updateCurrentBlockPosAndValue.
+// Uses EntityBudgetSystem tiers for consistent distance classification.
+// This method updates the entity's knowledge of which block it occupies —
+// needed for damage-over-time (fire, drowning) and navigation hints.
+// For distant non-combat entities the stale-by-a-few-frames data is harmless.
+
+using System.Collections.Generic;
+using HarmonyLib;
+using UnityEngine;
+
+[HarmonyPatch(typeof(EntityAlive), "updateCurrentBlockPosAndValue")]
+public static class BlockPosUpdateThrottlePatch
+{
+    private static readonly Dictionary<int, int> s_lastFrame = new Dictionary<int, int>(256);
+
+    public static bool Prefix(EntityAlive __instance)
+    {
+        if (!OptimizationConfig.Current.EnableBlockPosThrottle) return true;
+        if (__instance == null) return true;
+        if (__instance is EntityPlayer) return true;
+
+        FrameCache.EnsureUpdated();
+        if (FrameCache.ShouldBypassThrottling) return true;
+
+        try
+        {
+            if (__instance.IsSleeping) return true;
+
+            int zombieCount = FrameCache.ZombieCount;
+            if (zombieCount < AdaptiveThresholds.EmergencyZombieThreshold)
+                return true;
+
+            int entityId = __instance.entityId;
+
+            if (!EntityBudgetSystem.TryGetInfo(entityId, out var budgetInfo))
+                return true;
+
+            // Critical tier always gets full updates
+            if (budgetInfo.Tier == EntityBudgetSystem.Tier.Critical) return true;
+
+            // Use budget system interval, with a minimum of 2 for block pos
+            int interval = EntityBudgetSystem.GetRecommendedInterval(budgetInfo.Tier, zombieCount);
+            if (interval <= 1) return true;
+
+            int currentFrame = Time.frameCount;
+
+            if (!s_lastFrame.TryGetValue(entityId, out int lastFrame))
+            {
+                s_lastFrame[entityId] = currentFrame;
+                return true;
+            }
+
+            if (currentFrame - lastFrame >= interval)
+            {
+                s_lastFrame[entityId] = currentFrame;
+                return true;
+            }
+
+            ProfilerCounterBridge.Increment("BlockPosUpdate.Throttled");
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    public static void OnEntityRemoved(int entityId) => s_lastFrame.Remove(entityId);
+    public static void ClearCaches() => s_lastFrame.Clear();
+}
