@@ -108,8 +108,34 @@ public class OptimizationConfig
     // are just bystanders.  Disable if you notice alert zombies being sluggish.
     public bool EnableCombatSubClassification = true;
 
+    // XUi throttle — cap XUiUpdater.Update() to ~45 fps (default).
+    // The HUD/inventory UI is imperceptible above ~30fps; running it every
+    // game frame at 60-120 fps wastes CPU on DOM dirtying and layout recalc.
+    // The throttle is bypassed when a menu/timer window is open so UI stays
+    // responsive during interaction.
+    public bool EnableXUiThrottle = true;
+    public float XUiThrottleFPS = 45f;
+
+    // Animator transform-hierarchy optimisation — calls Unity's built-in
+    // AnimatorUtility.OptimizeTransformHierarchy on each zombie when it spawns.
+    // This collapses the skeleton's Transform tree into flat arrays inside
+    // Mecanim, removing O(n) per-frame hierarchy traversal by the animation
+    // engine.  Critical bones (head, neck, gore joints, limbs used by hit/
+    // dismemberment) are explicitly excluded so they remain reachable.
+    // On death the hierarchy is restored before dismemberment runs.
+    // Savings scale linearly with zombie count — significant during hordes.
+    public bool EnableAnimatorOptimize = false;
+
+    // Per-layer camera cull distance — sets Camera.layerCullDistances for
+    // terrain-detail (layer 23) and vegetation/grass (layer 28) based on
+    // player elevation.  At ground level this caps detail rendering to
+    // ~75 m and vegetation to ~150 m; at altitude the budget grows with
+    // line-of-sight.  Uses spherical culling for correct horizon behaviour.
+    // Updated every 120 frames (~2 s) to avoid per-frame camera property writes.
+    public bool EnableLayerDistanceCulling = true;
+
     public const string ConfigFileName = "fps_optimization_config.json";
-    private const int ConfigVersion = 14;
+    private const int ConfigVersion = 15;
     public int Version = ConfigVersion;
 
     public static OptimizationConfig Current { get; private set; } = new OptimizationConfig();

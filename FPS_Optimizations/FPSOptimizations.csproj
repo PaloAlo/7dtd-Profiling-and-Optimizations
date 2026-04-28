@@ -10,11 +10,13 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <Compile Remove="src\Optimization\PrefabLODInstrumentation.cs" />
+	  <Compile Remove="FPS_Optimizations\**" />
+	  <EmbeddedResource Remove="FPS_Optimizations\**" />
+	  <None Remove="FPS_Optimizations\**" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="FPS_Optimizations\src\Optimization\" />
+	  <Compile Remove="src\Optimization\PrefabLODInstrumentation.cs" />
 	</ItemGroup>
 
 </Project>

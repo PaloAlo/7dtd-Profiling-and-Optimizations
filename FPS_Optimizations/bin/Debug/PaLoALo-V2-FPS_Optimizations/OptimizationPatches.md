@@ -113,7 +113,7 @@ Emergency and Critical zombie count thresholds adjust dynamically based on FPS h
 │  ├── StepSound (20 Hz rate limit)                        │
 │  ├── ThreatLevel (music scan throttle)                   │
 │  ├── ParticleEffect (horde particle reduction)           │
-│  ├── VoxelFastReject (PhysX → voxel for path LOS)       │
+│  ├── VoxelFastReject (PhysX → voxel for path LOS)        │
 │  └── AttackTargetNullCheck (crash prevention)            │
 │                                                          │
 │ Player-Specific:                                         │
@@ -121,7 +121,7 @@ Emergency and Critical zombie count thresholds adjust dynamically based on FPS h
 │  └── BlockRadiusEffectsTick (every 2-3 frames)           │
 │                                                          │
 │ World-Level:                                             │
-│  ├── ChunkCopyTimeBudget (deltaTime × 0.5 cap)          │
+│  ├── ChunkCopyTimeBudget (deltaTime × 0.5 cap)           │
 │  ├── ChunkDirectionalPriority (player-facing first)      │
 │  ├── ThreadPoolConsolidation (.NET pool for game threads)│
 │  ├── SleeperVolumeThrottle (every 4th tick)              │
@@ -385,6 +385,27 @@ Caches `GetAttackTarget()` and `GetRevengeTarget()` per entity per frame. **Disa
 
 ---
 
+### 20. XUiThrottlePatch.cs 
+	— XUi frame rate cap
+	Caps XUiUpdater.Update() to 45fps. 
+	HUD layout recalc every frame is wasted CPU — imperceptible above ~30fps.
+
+### 21. XUiAlwaysUpdatePatch.cs 
+	— Stop forced hotbar/radial rebuild every frame
+	Toolbelt + Radial AlwaysUpdate()→false stops forced dirty-rebuild every frame.
+
+### 22. OcclusionLimitFix.cs 
+	— Prevent occlusion pool exhaustion
+	Prevents occlusion entry pool exhaustion during large hordes. 
+	When pool empties, entities stop being occlusion-culled and render through walls — direct GPU draw-call waste.
+
+### 23. LayerDistanceCullingPatch.cs 
+	— Per-layer GPU cull distances for terrain/vegetation
+	Sets per-layer camera cull distances for terrain-detail (layer 23) and vegetation (layer 28). 
+	Caps grass/detail rendering at 75-150m depending on elevation, reducing GPU fill rate significantly.
+
+---
+
 ## Configuration
 
 All patches can be toggled via `fps_optimization_config.json` loaded at startup. Supports hot-reload via file watcher.
@@ -414,9 +435,12 @@ All patches can be toggled via `fps_optimization_config.json` loaded at startup.
 | `ThreatLevelThrottleZombieThreshold` | `15` | Min zombies to activate |
 | `ThreatLevelThrottleFrames` | `30` | Cache duration in frames |
 | `EnableCombatSubClassification` | `true` | Separates active combat from aware-only for tier classification |
+| `EnableXUiThrottle` | `true` | XUi throttle patch |
+| `XUiThrottleFPS` | `45.0` | Target FPS for XUi throttle |
+| `EnableLayerDistanceCulling` | `true` | Layer distance culling patch |
 | `EnableEAIManagerThrottle` | `false` | EAI manager eval throttle (disabled — caused sleeper detection issues) |
 
-Config version: 14
+Config version: 15
 
 ---
 

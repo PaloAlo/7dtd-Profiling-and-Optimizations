@@ -1,0 +1,193 @@
+﻿// AnimatorOptimizePatch.cs
+//
+// Calls AnimatorUtility.OptimizeTransformHierarchy() on each zombie when it
+// spawns into the world.  This Unity built-in collapses the skeleton's
+// Transform hierarchy into flat internal arrays inside the Mecanim animation
+// engine, eliminating the O(n) per-frame parent-chain traversal that normally
+// occurs for every bone during animation evaluation.  At 80+ zombies the
+// cumulative savings are substantial.
+//
+// BONE EXCLUSIONS — bones listed here remain as live Transform objects after
+// optimization so the game can still look them up by name for:
+//   - Hit detection (GetHitTransform → head/neck/biped-root/biped-pelvis)
+//   - Gore / dismemberment (L_HeadGore, L_*ArmGore, L_*LegGore tag bones)
+//   - Limb IK (LeftUpLeg, LeftLeg, RightUpLeg, RightLeg, LeftArm etc.)
+//   - Right-hand item attachment (GetRightHandTransformName)
+//   - Neck accessories / headgear (HeadAccessories, Neck)
+//   - JiggleBone system (already excluded as it uses component, not Transform)
+//
+// ON DEATH — DeoptimizeTransformHierarchy is called first so the full
+// hierarchy is restored before the game tries to detach gore pieces.
+//
+// Adapted from Redbeardt's Afterlife mod (AnimatorUtilityOptimisation.cs),
+// rewritten for OptimizationConfig and without Afterlife-specific dependencies.
+
+using System.Collections.Generic;
+using HarmonyLib;
+using UnityEngine;
+
+public static class AnimatorOptimizePatch
+{
+    private static readonly HashSet<int> s_optimizedIds = new HashSet<int>();
+
+    // ------------------------------------------------------------------ //
+    //  Spawn hook — optimise transform hierarchy on world entry            //
+    // ------------------------------------------------------------------ //
+    [HarmonyPatch(typeof(World), nameof(World.SpawnEntityInWorld))]
+    public static class SpawnPatch
+    {
+        [HarmonyPostfix]
+        public static void Postfix(Entity _entity)
+        {
+            if (!OptimizationConfig.Current.EnableAnimatorOptimize) return;
+            if (!(_entity is EntityZombie ez)) return;
+
+            try { Apply(ez); }
+            catch { /* never crash the spawn path */ }
+        }
+    }
+
+    // ------------------------------------------------------------------ //
+    //  Death hook — deoptimise before dismemberment runs                   //
+    // ------------------------------------------------------------------ //
+    [HarmonyPatch(typeof(EModelBase), "OnDeath")]
+    public static class DeathPatch
+    {
+        [HarmonyPrefix]
+        public static void Prefix(EModelBase __instance, ref Entity ___entity)
+        {
+            if (!OptimizationConfig.Current.EnableAnimatorOptimize) return;
+            if (!(___entity is EntityZombie ez)) return;
+            if (!s_optimizedIds.Contains(ez.entityId)) return;
+
+            try { Restore(ez); }
+            catch { }
+        }
+    }
+
+    // ------------------------------------------------------------------ //
+    //  Core logic                                                          //
+    // ------------------------------------------------------------------ //
+    private static void Apply(EntityZombie ez)
+    {
+        Animator anim = ((Component)ez).GetComponentInChildren<Animator>(true);
+        if (anim == null || !anim.isOptimizable) return;
+
+        EModelBase em = ez.emodel;
+        if (em == null) return;
+
+        // Collect bones that must stay as live Transforms
+        var keep = new List<string>();
+
+        // All bone names are validated via TryAdd() against the Animator GO's
+        // subtree (animRoot) — the exact same scope that OptimizeTransformHierarchy
+        // uses.  AddName() must NOT be used here because it bypasses the existence
+        // check and causes "Unable to optimize missing transform" warnings for any
+        // bone that lives outside this subtree.
+        Transform animRoot = ((Component)anim).transform;
+
+        // Hit / navigation bones — look up by the name stored on em's transform
+        // references, but only add if the bone actually lives under animRoot.
+        TryAdd(keep, animRoot, em.headTransform        != null ? em.headTransform.name        : null);
+        TryAdd(keep, animRoot, em.neckTransform        != null ? em.neckTransform.name        : null);
+        TryAdd(keep, animRoot, em.neckParentTransform  != null ? em.neckParentTransform.name  : null);
+        TryAdd(keep, animRoot, em.bipedRootTransform   != null ? em.bipedRootTransform.name   : null);
+        TryAdd(keep, animRoot, em.bipedPelvisTransform != null ? em.bipedPelvisTransform.name : null);
+        TryAdd(keep, animRoot, "Neck");
+        TryAdd(keep, animRoot, "HeadAccessories");
+
+        // Right-hand item attachment
+        TryAdd(keep, animRoot, ez.GetRightHandTransformName());
+
+        // Leg / arm IK bones (needed by CharacterController + IK)
+        TryAdd(keep, animRoot, "LeftUpLeg");
+        TryAdd(keep, animRoot, "LeftLeg");
+        TryAdd(keep, animRoot, "RightUpLeg");
+        TryAdd(keep, animRoot, "RightLeg");
+        TryAdd(keep, animRoot, "LeftArm");
+        TryAdd(keep, animRoot, "LeftForeArm");
+        TryAdd(keep, animRoot, "RightArm");
+        TryAdd(keep, animRoot, "RightForeArm");
+
+        // Gore tag bones (dismemberment)
+        TryAddTag(keep, animRoot, "L_HeadGore");
+        TryAddTag(keep, animRoot, "L_LeftLowerArmGore");
+        TryAddTag(keep, animRoot, "L_RightUpperArmGore");
+        TryAddTag(keep, animRoot, "L_RightLowerArmGore");
+        TryAddTag(keep, animRoot, "L_LeftUpperLegGore");
+        TryAddTag(keep, animRoot, "L_LeftLowerLegGore");
+        TryAddTag(keep, animRoot, "L_RightUpperLegGore");
+        TryAddTag(keep, animRoot, "L_RightLowerLegGore");
+
+        keep.RemoveAll(n => string.IsNullOrEmpty(n));
+
+        AnimatorUtility.OptimizeTransformHierarchy(
+            ((Component)anim).gameObject,
+            keep.ToArray());
+
+        // Restore emodel transform references so hit/look helpers still work
+        em.headTransform        = FindInChilds(((Component)ez).transform, em.headTransform);
+        em.neckTransform        = FindInChilds(((Component)ez).transform, em.neckTransform);
+        em.neckParentTransform  = FindInChilds(((Component)ez).transform, em.neckParentTransform);
+        em.bipedRootTransform   = FindInChilds(((Component)ez).transform, em.bipedRootTransform);
+        em.bipedPelvisTransform = FindInChilds(((Component)ez).transform, em.bipedPelvisTransform);
+
+        em.SetColliderLayers(((Component)anim).transform, 0);
+        s_optimizedIds.Add(ez.entityId);
+
+        ProfilerCounterBridge.Increment("AnimatorOptimize.Applied");
+    }
+
+    private static void Restore(EntityZombie ez)
+    {
+        Animator anim = ((Component)ez).GetComponentInChildren<Animator>();
+        if (anim == null) return;
+
+        AnimatorUtility.DeoptimizeTransformHierarchy(((Component)anim).gameObject);
+
+        // Restoring the hierarchy is sufficient — the death/gore system
+        // uses Transform.Find which works again once the hierarchy is full.
+
+        s_optimizedIds.Remove(ez.entityId);
+    }
+
+    // ------------------------------------------------------------------ //
+    //  Helpers                                                             //
+    // ------------------------------------------------------------------ //
+    private static void AddName(List<string> list, Transform t)
+    {
+        if (t != null && !string.IsNullOrEmpty(t.name))
+            list.Add(t.name);
+    }
+
+    private static void TryAdd(List<string> list, Transform root, string name)
+    {
+        if (string.IsNullOrEmpty(name)) return;
+        if (root.FindInChilds(name) != null && !list.Contains(name))
+            list.Add(name);
+    }
+
+    private static void TryAddTag(List<string> list, Transform root, string tag)
+    {
+        Transform t = GameUtils.FindTagInChilds(root, tag);
+        if (t != null)
+        {
+            string n = t.name;
+            if (!string.IsNullOrEmpty(n) && !list.Contains(n))
+                list.Add(n);
+        }
+    }
+
+    /// <summary>
+    /// After OptimizeTransformHierarchy the original Transform reference is
+    /// still valid if the bone was in the exclusion list; just re-resolve by
+    /// name so nothing drifts.
+    /// </summary>
+    private static Transform FindInChilds(Transform root, Transform original)
+    {
+        if (original == null) return null;
+        return root.FindInChilds(original.name) ?? original;
+    }
+
+    public static void ClearCaches() => s_optimizedIds.Clear();
+}

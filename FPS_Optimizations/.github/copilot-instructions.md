@@ -6,6 +6,7 @@
 - Provide concise progress updates; avoid stalling mid-sentence. Continue tasks, report build results, and resume work until requested to stop.
 - Allow autonomous progress; proceed without interrupting the user until scans or implementations are complete.
 - Prefer concrete internal types over reflection for performance; use try/catch around task calls to avoid crashes.
+- Do not prompt the user to start .NET modernization/upgrade; user rejects the modernizer and prefers no further prompts.
 
 ## Project Guidelines
 - Optimization mod (FPS Optimizations) reports runtime counters into the Profiler via reflection into `ProfilingUtils.PerFrameCounters`; keep `PerFrameCounters` API stable and preserve reflection bridge compatibility.

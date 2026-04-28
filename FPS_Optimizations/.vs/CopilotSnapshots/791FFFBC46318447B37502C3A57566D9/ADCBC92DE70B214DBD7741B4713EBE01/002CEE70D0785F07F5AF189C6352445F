@@ -1,4 +1,4 @@
-// ZombieFrameSkipPatch.cs
+﻿// ZombieFrameSkipPatch.cs
 //
 // Skips EntityAlive.Update() for Low-tier entities (>80m, non-active-combat)
 // during high zombie counts.  Update() itself is cheap (~0.018 ms) but at

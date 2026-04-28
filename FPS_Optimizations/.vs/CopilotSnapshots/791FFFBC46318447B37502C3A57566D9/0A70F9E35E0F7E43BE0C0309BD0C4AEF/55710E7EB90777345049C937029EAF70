@@ -1,0 +1,43 @@
+﻿// XUiAlwaysUpdatePatch.cs
+//
+// Prevents XUiC_Toolbelt and XUiC_Radial from forcing a full XUi
+// rebuild every single frame by returning false from AlwaysUpdate().
+//
+// XUiUpdater calls AlwaysUpdate() on each controller to decide whether
+// to mark it dirty unconditionally.  Vanilla returns true for the hotbar
+// and radial menu, meaning they get a full DOM rebuild + layout recalc
+// every frame regardless of whether any data changed.
+//
+// Returning false means these controllers only rebuild when they have
+// genuine dirty state (item changes, etc.) — the correct behaviour.
+// The XUiThrottlePatch already limits how often XUiUpdater runs;
+// this patch reduces the work done *within* each update that does fire.
+//
+// Adapted from Redbeardt's Afterlife mod (XUiOpts.cs).
+
+using HarmonyLib;
+
+[HarmonyPatch(typeof(XUiC_Toolbelt), "AlwaysUpdate")]
+public static class XUiToolbeltAlwaysUpdatePatch
+{
+    [HarmonyPrefix]
+    public static bool Prefix(ref bool __result)
+    {
+        if (!OptimizationConfig.Current.EnableXUiThrottle) return true;
+        __result = false;
+        return false;
+    }
+}
+/*
+[HarmonyPatch(typeof(XUiC_Radial), "AlwaysUpdate")]
+public static class XUiRadialAlwaysUpdatePatch
+{
+    [HarmonyPrefix]
+    public static bool Prefix(ref bool __result)
+    {
+        if (!OptimizationConfig.Current.EnableXUiThrottle) return true;
+        __result = false;
+        return false;
+    }
+}
+*/

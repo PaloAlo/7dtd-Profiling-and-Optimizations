@@ -24,6 +24,7 @@ public class ModInit : IModApi
               + $"JiggleBone={cfg.EnableJiggleBoneToggle}, ChunkBudget={cfg.EnableChunkCopyTimeBudget}, "
               + $"ChunkDir={cfg.EnableChunkDirectionalPriority}, ThreadPool={cfg.EnableThreadPoolConsolidation}, "
               + $"UAIThrottle={cfg.EnableUAIDecisionThrottle}, ParticleThrottle={cfg.EnableParticleThrottle}, "
-              + $"ThreatLevelThrottle={cfg.EnableThreatLevelThrottle}");
+              + $"ThreatLevelThrottle={cfg.EnableThreatLevelThrottle}, XUiThrottle={cfg.EnableXUiThrottle}@{cfg.XUiThrottleFPS}fps, "
+              + $"AnimatorOptimize={cfg.EnableAnimatorOptimize}, LayerDistCull={cfg.EnableLayerDistanceCulling}");
     }
 }
